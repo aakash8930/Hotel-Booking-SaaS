@@ -1,0 +1,53 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Hotel Booking SaaS — Local Development
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Usage:
+#   docker compose up -d        # Start Postgres + Redis
+#   pnpm dev                    # Start all Node.js services
+#   cd apps/realtime && go run .  # Start Go WebSocket service
+#
+# Or start everything:
+#   docker compose up -d && pnpm dev & (cd apps/realtime && go run .)
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: '3.8'
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: hbs-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hotel_booking_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: hbs-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
