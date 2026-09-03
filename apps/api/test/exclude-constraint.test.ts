@@ -18,13 +18,20 @@
  *   7. Clean up test data
  *
  * Usage:
- *   pnpm --filter @hbs/prisma exec tsx test/exclude-constraint.test.ts
+ *   pnpm test:exclude
  *
  * Prerequisites:
  *   - DATABASE_URL set in .env
  *   - Schema pushed: pnpm db:push
  * ─────────────────────────────────────────────────────────────────────────────
  */
+
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env from project root
+config({ path: resolve(__dirname, '../../../.env') });
+config({ path: resolve(__dirname, '../../.env') });
 
 import { PrismaClient, BookingStatus } from '@prisma/client';
 

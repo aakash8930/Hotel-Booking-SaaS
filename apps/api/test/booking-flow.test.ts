@@ -19,9 +19,16 @@
  *
  * Usage:
  *   pnpm dev:api   # In terminal 1
- *   pnpm --filter @hbs/api exec tsx test/booking-flow.test.ts  # In terminal 2
+ *   pnpm test:booking  # In terminal 2
  * ─────────────────────────────────────────────────────────────────────────────
  */
+
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env from project root
+config({ path: resolve(__dirname, '../../../.env') });
+config({ path: resolve(__dirname, '../../.env') });
 
 const API = 'http://localhost:4000/api/v1';
 const ts = Date.now();
