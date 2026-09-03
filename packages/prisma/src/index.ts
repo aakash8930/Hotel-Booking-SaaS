@@ -10,18 +10,25 @@ const globalForPrisma = globalThis as unknown as {
  * In development, the client is cached on globalThis to survive
  * hot-reload cycles without exhausting database connections.
  */
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === 'development'
-        ? ['query', 'error', 'warn']
-        : ['error'],
-  });
+let prisma: PrismaClient;
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
+try {
+  prisma =
+    globalForPrisma.prisma ??
+    new PrismaClient({
+      log:
+        process.env.NODE_ENV === 'development'
+          ? ['query', 'error', 'warn']
+          : ['error'],
+    });
+
+  if (process.env.NODE_ENV !== 'production') {
+    globalForPrisma.prisma = prisma;
+  }
+} catch (error) {
+  console.error('Failed to initialize Prisma client:', error);
+  throw error;
 }
 
-export { PrismaClient };
+export { prisma, PrismaClient };
 export * from '@prisma/client';
