@@ -76,25 +76,9 @@ export function Hero() {
           <a href="#search" className="btn-primary text-lg px-8 py-4">
             Find your stay
           </a>
-          <a href="/host" className="btn-secondary text-lg px-8 py-4">
+          <a href="/host/properties" className="btn-secondary text-lg px-8 py-4">
             List your property
           </a>
-        </div>
-
-        {/* Stats */}
-        <div className="mt-16 grid grid-cols-3 gap-8 max-w-2xl mx-auto">
-          <div className="text-center">
-            <div className="text-3xl md:text-4xl font-bold text-brand-600">500+</div>
-            <div className="text-sm text-surface-500 mt-1">Homestays</div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl md:text-4xl font-bold text-brand-600">50+</div>
-            <div className="text-sm text-surface-500 mt-1">Cities</div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl md:text-4xl font-bold text-brand-600">10k+</div>
-            <div className="text-sm text-surface-500 mt-1">Happy guests</div>
-          </div>
         </div>
       </div>
 

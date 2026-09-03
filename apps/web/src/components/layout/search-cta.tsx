@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
 export function SearchCTA() {
+  const router = useRouter();
   const [destination, setDestination] = useState('');
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
@@ -11,8 +13,13 @@ export function SearchCTA() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Navigate to search results page
-    console.log('Search:', { destination, checkIn, checkOut, guests });
+    const params = new URLSearchParams({
+      city: destination,
+      checkIn,
+      checkOut,
+      guests,
+    });
+    router.push(`/search?${params.toString()}`);
   };
 
   return (

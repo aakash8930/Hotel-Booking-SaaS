@@ -90,7 +90,7 @@ class ApiClient {
       }
 
       return data;
-    } catch (error) {
+    } catch {
       return {
         success: false,
         error: {
@@ -139,14 +139,14 @@ class ApiClient {
   async post<T>(endpoint: string, body?: unknown) {
     return this.request<T>(endpoint, {
       method: 'POST',
-      body: body ? JSON.stringify(body) : undefined,
+      ...(body !== undefined && { body: JSON.stringify(body) }),
     });
   }
 
   async put<T>(endpoint: string, body?: unknown) {
     return this.request<T>(endpoint, {
       method: 'PUT',
-      body: body ? JSON.stringify(body) : undefined,
+      ...(body !== undefined && { body: JSON.stringify(body) }),
     });
   }
 

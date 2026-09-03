@@ -28,6 +28,7 @@ import { BookingStatus, PaymentStatus } from '@hbs/prisma';
 import { randomUUID } from 'crypto';
 import { assertCanTransition, canTransition } from '../common/booking-state';
 import { PhonePeService } from './phonepe.service';
+import { EmailService } from './email.service';
 
 @Injectable()
 export class PaymentsService {
@@ -36,6 +37,7 @@ export class PaymentsService {
   constructor(
     private readonly phonepe: PhonePeService,
     private readonly config: ConfigService,
+    private readonly email: EmailService,
   ) {}
 
   /**
@@ -103,17 +105,10 @@ export class PaymentsService {
       'http://localhost:4000',
     );
 
-    const phonepeResponse = await this.phonepe.initiatePayment({
-      transactionId,
-      amount: amountPaise,
-      callbackUrl: `${appUrl}/booking/${bookingId}/payment-callback`,
-      webhookUrl: `${apiUrl}/api/v1/payments/webhook/phonepe`,
-      guestName: booking.guest.name,
-      guestEmail: booking.guest.email,
-      ...(booking.guest.phone ? { guestPhone: booking.guest.phone } : {}),
-    });
-
     // ── Create payment record ──────────────────────────────────────────
+    // Created before the PhonePe call so its id is known and can be
+    // embedded in the callback URL — the frontend needs `paymentId` to
+    // call GET /payments/verify/:paymentId once the guest returns.
     const payment = await prisma.payment.create({
       data: {
         bookingId,
@@ -123,6 +118,16 @@ export class PaymentsService {
         provider: 'phonepe',
         providerTxnId: transactionId,
       },
+    });
+
+    const phonepeResponse = await this.phonepe.initiatePayment({
+      transactionId,
+      amount: amountPaise,
+      callbackUrl: `${appUrl}/booking/${bookingId}/payment-callback?paymentId=${payment.id}`,
+      webhookUrl: `${apiUrl}/api/v1/payments/webhook/phonepe`,
+      guestName: booking.guest.name,
+      guestEmail: booking.guest.email,
+      ...(booking.guest.phone ? { guestPhone: booking.guest.phone } : {}),
     });
 
     this.logger.log(
@@ -254,6 +259,8 @@ export class PaymentsService {
         `Payment SUCCESS: ${paymentId} | Booking ${bookingId} → PAID`,
       );
 
+      void this.sendConfirmationEmail(bookingId);
+
       return { processed: true, message: 'Payment successful, booking confirmed' };
     } catch (error) {
       if (error instanceof ConflictException) {
@@ -261,6 +268,50 @@ export class PaymentsService {
         return { processed: false, message: 'Already processed (concurrent)' };
       }
       throw error;
+    }
+  }
+
+  /**
+   * Fetch booking details and send the confirmation email.
+   *
+   * Called after a payment is confirmed successful. Never throws — a
+   * confirmation email failing to send must not affect the payment/booking
+   * state, which has already been committed by this point.
+   */
+  private async sendConfirmationEmail(bookingId: string): Promise<void> {
+    try {
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: {
+          guest: { select: { name: true, email: true } },
+          room: {
+            select: {
+              name: true,
+              currency: true,
+              property: { select: { name: true } },
+            },
+          },
+        },
+      });
+
+      if (!booking) return;
+
+      await this.email.sendBookingConfirmation({
+        guestEmail: booking.guest.email,
+        guestName: booking.guest.name,
+        propertyName: booking.room.property.name,
+        roomName: booking.room.name,
+        checkIn: booking.checkIn.toISOString().split('T')[0]!,
+        checkOut: booking.checkOut.toISOString().split('T')[0]!,
+        totalPrice: Number(booking.totalPrice),
+        currency: booking.room.currency,
+        bookingId: booking.id,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to prepare confirmation email for booking ${bookingId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 

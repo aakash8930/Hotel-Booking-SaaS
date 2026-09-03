@@ -35,7 +35,6 @@ const ts = Date.now();
 
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
-const YELLOW = '\x1b[33m';
 const CYAN = '\x1b[36m';
 const BOLD = '\x1b[1m';
 const RESET = '\x1b[0m';
@@ -126,11 +125,9 @@ async function main() {
     });
 
     let propertyId: string;
-    let propertySlug: string;
 
     if (prop.data.success) {
       propertyId = prop.data.data.id;
-      propertySlug = prop.data.data.slug;
       pass(`Property created: ${prop.data.data.name} (${propertyId})`);
     } else {
       fail(`Property creation failed: ${JSON.stringify(prop.data)}`);

@@ -63,10 +63,13 @@ export class PhonePeService {
     const merchantId = this.config.get<string>('PHONEPE_MERCHANT_ID', 'TEST_MERCHANT');
 
     if (this.isSandbox) {
-      // Sandbox mode — return a mock redirect URL
+      // Sandbox mode — return a mock redirect URL. callbackUrl may already
+      // carry its own query string (e.g. ?paymentId=...), so append with
+      // the correct separator instead of assuming a bare URL.
       this.logger.log(`[SANDBOX] Payment initiated: ${params.transactionId} (₹${params.amount / 100})`);
+      const separator = params.callbackUrl.includes('?') ? '&' : '?';
       return {
-        redirectUrl: `${params.callbackUrl}?transactionId=${params.transactionId}&status=SUCCESS`,
+        redirectUrl: `${params.callbackUrl}${separator}transactionId=${params.transactionId}&status=SUCCESS`,
         transactionId: params.transactionId,
         merchantId,
       };

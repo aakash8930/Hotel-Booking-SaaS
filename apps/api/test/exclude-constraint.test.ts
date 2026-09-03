@@ -298,7 +298,7 @@ async function main() {
     section('Test 6: Concurrent inserts (5 overlapping) — exactly 1 should succeed');
 
     const concurrentResults = await Promise.allSettled(
-      Array.from({ length: 5 }, (_, i) =>
+      Array.from({ length: 5 }, () =>
         prisma.booking.create({
           data: {
             roomId: room.id,

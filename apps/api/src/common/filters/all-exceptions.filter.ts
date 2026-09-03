@@ -28,11 +28,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exResponse = exception.getResponse();
-      message =
-        typeof exResponse === 'string'
-          ? exResponse
-          : (exResponse as { message: string }).message ?? exception.message;
-      code = `HTTP_${status}`;
+      if (typeof exResponse === 'string') {
+        message = exResponse;
+        code = `HTTP_${status}`;
+      } else {
+        const body = exResponse as { message?: string | string[]; code?: string };
+        message = Array.isArray(body.message)
+          ? body.message.join(', ')
+          : body.message ?? exception.message;
+        code = body.code ?? `HTTP_${status}`;
+      }
     } else if (exception instanceof Error) {
       // Prisma known errors (e.g. EXCLUDE constraint violation)
       if (

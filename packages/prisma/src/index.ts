@@ -1,7 +1,22 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+};
+
+/**
+ * Prisma's Decimal serializes to a string by default (`Decimal.toJSON()`
+ * returns `.toString()`), which silently disagrees with the @hbs/shared
+ * TypeScript contracts that declare these fields as `number`. At the
+ * precision used here (currency to 2dp, lat/lng to 8dp) there's no
+ * float-safety concern, so every Decimal field is serialized as a plain
+ * JSON number instead — applied once, globally, rather than requiring
+ * every service to remember to call Number() individually.
+ */
+(Prisma.Decimal.prototype as unknown as { toJSON(): number }).toJSON = function (
+  this: InstanceType<typeof Prisma.Decimal>,
+) {
+  return this.toNumber();
 };
 
 /**

@@ -10,7 +10,7 @@ interface Property {
   city: string;
   state: string;
   status: string;
-  rooms: any[];
+  rooms: unknown[];
   _count: { rooms: number };
 }
 

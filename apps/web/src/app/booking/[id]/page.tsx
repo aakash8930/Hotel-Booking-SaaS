@@ -9,7 +9,7 @@ export default function BookingPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const roomId = params.roomId as string;
+  const roomId = params.id as string;
 
   const [formData, setFormData] = useState({
     guestName: '',
