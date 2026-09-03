@@ -20,6 +20,10 @@
     "db:studio": "pnpm --filter @hbs/prisma studio",
     "db:seed": "pnpm --filter @hbs/prisma seed"
   },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "dotenv": "^16.4.0"
+  },
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"

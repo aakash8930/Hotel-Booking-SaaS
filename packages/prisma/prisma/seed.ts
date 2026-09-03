@@ -1,4 +1,10 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env from multiple possible locations
+config({ path: resolve(__dirname, '../.env') });      // packages/prisma/.env
+config({ path: resolve(__dirname, '../../../.env') }); // root .env (takes precedence if both exist)
+
 import { PrismaClient, BookingStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
