@@ -12,6 +12,10 @@
     "declarationMap": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
+    "strictPropertyInitialization": false,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
+    "skipLibCheck": true,
     "paths": {
       "@/*": ["src/*"]
     }

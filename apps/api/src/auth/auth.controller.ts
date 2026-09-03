@@ -24,7 +24,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  @Throttle({ limit: 5, ttl: 60_000 }) // Max 5 registrations per minute per IP
+  @Throttle({ default: { limit: 5, ttl: 60_000 } }) // Max 5 registrations per minute per IP
   async register(@Body() dto: RegisterDto) {
     return {
       success: true,
@@ -34,7 +34,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ limit: 10, ttl: 60_000 }) // Max 10 login attempts per minute per IP
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // Max 10 login attempts per minute per IP
   async login(@Body() dto: LoginDto) {
     return {
       success: true,

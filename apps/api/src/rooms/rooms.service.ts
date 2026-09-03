@@ -126,19 +126,21 @@ export class RoomsService {
     // Verify room exists and host owns it
     await this.findOne(hostId, propertyId, roomId);
 
+    // Build update data, filtering out undefined values
+    const updateData: Record<string, any> = {};
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.capacity !== undefined) updateData.capacity = dto.capacity;
+    if (dto.basePrice !== undefined) updateData.basePrice = parseFloat(dto.basePrice.toString());
+    if (dto.currency !== undefined) updateData.currency = dto.currency;
+    if (dto.images !== undefined) updateData.images = dto.images;
+    if (dto.amenities !== undefined) updateData.amenities = dto.amenities;
+    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+    if (dto.sortOrder !== undefined) updateData.sortOrder = dto.sortOrder;
+
     const room = await prisma.room.update({
       where: { id: roomId },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        capacity: dto.capacity,
-        basePrice: dto.basePrice ? parseFloat(dto.basePrice.toString()) : undefined,
-        currency: dto.currency,
-        images: dto.images,
-        amenities: dto.amenities,
-        isActive: dto.isActive,
-        sortOrder: dto.sortOrder,
-      },
+      data: updateData,
     });
 
     return room;

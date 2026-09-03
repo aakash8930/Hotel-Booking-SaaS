@@ -110,7 +110,7 @@ export class PaymentsService {
       webhookUrl: `${apiUrl}/api/v1/payments/webhook/phonepe`,
       guestName: booking.guest.name,
       guestEmail: booking.guest.email,
-      guestPhone: booking.guest.phone ?? undefined,
+      ...(booking.guest.phone ? { guestPhone: booking.guest.phone } : {}),
     });
 
     // ── Create payment record ──────────────────────────────────────────

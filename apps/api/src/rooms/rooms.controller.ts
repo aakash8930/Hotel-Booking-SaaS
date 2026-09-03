@@ -90,7 +90,7 @@ export class RoomsController {
     @Param('roomId') roomId: string,
   ) {
     const result = await this.roomsService.remove(hostId, propertyId, roomId);
-    return { success: true, ...result };
+    return result;
   }
 
   /**

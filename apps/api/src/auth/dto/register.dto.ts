@@ -6,7 +6,6 @@ import {
   IsOptional,
   Matches,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
   @IsEmail({}, { message: 'Please provide a valid email address' })

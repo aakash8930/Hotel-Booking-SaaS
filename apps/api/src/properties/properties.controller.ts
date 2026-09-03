@@ -81,7 +81,7 @@ export class PropertiesController {
     @Param('id') id: string,
   ) {
     const result = await this.propertiesService.remove(hostId, id);
-    return { success: true, ...result };
+    return result;
   }
 
   /**

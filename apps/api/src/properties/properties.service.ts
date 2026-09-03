@@ -120,23 +120,25 @@ export class PropertiesService {
     // Verify ownership
     await this.findOne(hostId, propertyId);
 
+    // Build update data, filtering out undefined values
+    const updateData: Record<string, any> = {};
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.address !== undefined) updateData.address = dto.address;
+    if (dto.city !== undefined) updateData.city = dto.city;
+    if (dto.state !== undefined) updateData.state = dto.state;
+    if (dto.pincode !== undefined) updateData.pincode = dto.pincode;
+    if (dto.latitude !== undefined) updateData.latitude = dto.latitude ? parseFloat(dto.latitude.toString()) : null;
+    if (dto.longitude !== undefined) updateData.longitude = dto.longitude ? parseFloat(dto.longitude.toString()) : null;
+    if (dto.coverImage !== undefined) updateData.coverImage = dto.coverImage;
+    if (dto.status !== undefined) updateData.status = dto.status;
+    if (dto.checkInTime !== undefined) updateData.checkInTime = dto.checkInTime;
+    if (dto.checkOutTime !== undefined) updateData.checkOutTime = dto.checkOutTime;
+    if (dto.rules !== undefined) updateData.rules = dto.rules ? JSON.stringify(dto.rules) : null;
+
     const property = await prisma.property.update({
       where: { id: propertyId },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        address: dto.address,
-        city: dto.city,
-        state: dto.state,
-        pincode: dto.pincode,
-        latitude: dto.latitude ? parseFloat(dto.latitude.toString()) : undefined,
-        longitude: dto.longitude ? parseFloat(dto.longitude.toString()) : undefined,
-        coverImage: dto.coverImage,
-        status: dto.status,
-        checkInTime: dto.checkInTime,
-        checkOutTime: dto.checkOutTime,
-        rules: dto.rules ? JSON.stringify(dto.rules) : undefined,
-      },
+      data: updateData,
     });
 
     return property;
