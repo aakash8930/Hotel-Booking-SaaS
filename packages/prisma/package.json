@@ -5,6 +5,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
+    "preinstall": "test -f .env || ln -sf ../../.env .env 2>/dev/null || true",
     "generate": "pnpm exec prisma generate",
     "migrate": "pnpm exec prisma migrate dev",
     "migrate:deploy": "pnpm exec prisma migrate deploy",
