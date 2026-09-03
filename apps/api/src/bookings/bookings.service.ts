@@ -7,7 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { prisma } from '@hbs/prisma';
-import { BookingStatus } from '@prisma/client';
+import { BookingStatus } from '@hbs/prisma';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 import { assertCanTransition } from '../common/booking-state';
 

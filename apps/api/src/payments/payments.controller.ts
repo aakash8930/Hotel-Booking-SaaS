@@ -28,7 +28,7 @@ import {
 import { PaymentsService } from './payments.service';
 import { PhonePeService } from './phonepe.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { BookingStatus } from '@prisma/client';
+import { BookingStatus } from '@hbs/prisma';
 
 @Controller('payments')
 export class PaymentsController {

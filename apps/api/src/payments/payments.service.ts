@@ -24,7 +24,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { prisma } from '@hbs/prisma';
-import { BookingStatus, PaymentStatus } from '@prisma/client';
+import { BookingStatus, PaymentStatus } from '@hbs/prisma';
 import { randomUUID } from 'crypto';
 import { assertCanTransition, canTransition } from '../common/booking-state';
 import { PhonePeService } from './phonepe.service';

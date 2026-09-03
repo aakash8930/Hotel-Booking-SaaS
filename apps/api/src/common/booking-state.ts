@@ -24,7 +24,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { BookingStatus } from '@prisma/client';
+import { BookingStatus } from '@hbs/prisma';
 import { BadRequestException } from '@nestjs/common';
 
 // ── Transition Map ───────────────────────────────────────────────────────────
