@@ -8,6 +8,7 @@ import { RoomsModule } from './rooms/rooms.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { SearchModule } from './search/search.module';
 import { UploadModule } from './upload/upload.module';
+import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './common/prisma.module';
 
 @Module({
@@ -37,6 +38,7 @@ import { PrismaModule } from './common/prisma.module';
     BookingsModule,
     SearchModule,
     UploadModule,
+    PaymentsModule,
   ],
 })
 export class AppModule {}

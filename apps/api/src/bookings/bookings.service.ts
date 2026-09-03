@@ -9,6 +9,7 @@ import {
 import { prisma } from '@hbs/prisma';
 import { BookingStatus } from '@prisma/client';
 import type { CreateBookingDto } from './dto/create-booking.dto';
+import { assertCanTransition } from '../common/booking-state';
 
 /** Duration of the soft-hold: 10 minutes to complete payment. */
 const HOLD_DURATION_MS = 10 * 60 * 1000;
@@ -19,22 +20,14 @@ export class BookingsService {
 
   /**
    * Create a new booking with a soft-hold.
-   *
-   * This inserts a PENDING booking with a hold_expires_at timestamp.
-   * The EXCLUDE constraint guarantees that no two overlapping active
-   * bookings can exist for the same room — if another booking already
-   * holds these dates, the database rejects this insert outright.
-   *
-   * @returns The created booking, or throws ConflictException on overlap.
+   * The EXCLUDE constraint guarantees no overlapping active bookings.
    */
   async create(dto: CreateBookingDto) {
     const checkIn = new Date(dto.checkIn);
     const checkOut = new Date(dto.checkOut);
 
-    // ── Validation ─────────────────────────────────────────────────────
     this.validateDateRange(checkIn, checkOut);
 
-    // ── Fetch room and calculate price ─────────────────────────────────
     const room = await prisma.room.findUnique({
       where: { id: dto.roomId },
       include: {
@@ -60,14 +53,10 @@ export class BookingsService {
       );
     }
 
-    // Calculate total price: base_price × number_of_nights
     const nights = this.calculateNights(checkIn, checkOut);
     const totalPrice = Number(room.basePrice) * nights;
 
-    // ── Find or create guest ───────────────────────────────────────────
     const guest = await this.findOrCreateGuest(dto);
-
-    // ── Insert booking (EXCLUDE constraint will reject overlaps) ───────
     const holdExpiresAt = new Date(Date.now() + HOLD_DURATION_MS);
 
     try {
@@ -101,13 +90,7 @@ export class BookingsService {
               },
             },
           },
-          guest: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
+          guest: { select: { id: true, name: true, email: true } },
         },
       });
 
@@ -117,17 +100,8 @@ export class BookingsService {
           `Hold expires: ${holdExpiresAt.toISOString()}`,
       );
 
-      return {
-        ...booking,
-        nights,
-        holdDurationMinutes: HOLD_DURATION_MS / 60_000,
-      };
+      return { ...booking, nights, holdDurationMinutes: HOLD_DURATION_MS / 60_000 };
     } catch (error: unknown) {
-      // ── EXCLUDE constraint violation ─────────────────────────────────
-      // PostgreSQL raises a serialization/exclusion violation when the
-      // EXCLUDE USING gist constraint detects overlapping date ranges.
-      // Prisma surfaces this as a PrismaClientKnownRequestError with
-      // specific error codes.
       return this.handleBookingError(error);
     }
   }
@@ -147,30 +121,14 @@ export class BookingsService {
             images: true,
             property: {
               select: {
-                id: true,
-                name: true,
-                slug: true,
-                address: true,
-                city: true,
-                state: true,
-                checkInTime: true,
-                checkOutTime: true,
+                id: true, name: true, slug: true, address: true,
+                city: true, state: true, checkInTime: true, checkOutTime: true,
               },
             },
           },
         },
-        guest: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        payments: {
-          orderBy: { initiatedAt: 'desc' },
-          take: 1,
-        },
+        guest: { select: { id: true, name: true, email: true, phone: true } },
+        payments: { orderBy: { initiatedAt: 'desc' }, take: 1 },
       },
     });
 
@@ -182,8 +140,12 @@ export class BookingsService {
   }
 
   /**
-   * Confirm a booking (transition from PENDING → CONFIRMED).
-   * In a real flow, this happens after payment verification.
+   * Confirm a booking: PENDING → CONFIRMED
+   * Uses the state machine for validation.
+   *
+   * NOTE: In the payment flow, this transition happens inside
+   * PaymentsService.initiatePayment(). This endpoint exists
+   * for backwards compatibility and testing.
    */
   async confirm(bookingId: string) {
     const booking = await prisma.booking.findUnique({
@@ -194,40 +156,34 @@ export class BookingsService {
       throw new NotFoundException('Booking not found');
     }
 
-    if (booking.status !== BookingStatus.PENDING) {
-      throw new BadRequestException(
-        `Cannot confirm booking with status: ${booking.status}`,
-      );
-    }
+    // Validate transition using the state machine
+    assertCanTransition(booking.status, BookingStatus.CONFIRMED);
 
     // Check if hold has expired
     if (booking.holdExpiresAt && booking.holdExpiresAt < new Date()) {
-      // Auto-expire the hold
+      // Validate and perform PENDING → EXPIRED
+      assertCanTransition(booking.status, BookingStatus.EXPIRED);
       await prisma.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.EXPIRED },
       });
-
-      throw new BadRequestException(
-        'Booking hold has expired. Please create a new booking.',
-      );
+      throw new BadRequestException('Booking hold has expired. Please create a new booking.');
     }
 
     const updated = await prisma.booking.update({
       where: { id: bookingId },
       data: {
         status: BookingStatus.CONFIRMED,
-        holdExpiresAt: null, // No longer needed
+        holdExpiresAt: null,
       },
     });
 
-    this.logger.log(`Booking confirmed: ${bookingId}`);
+    this.logger.log(`Booking confirmed: ${bookingId} (${booking.status} → CONFIRMED)`);
     return updated;
   }
 
   /**
-   * Cancel a booking.
-   * Releases the dates so others can book them.
+   * Cancel a booking — uses state machine to validate transition.
    */
   async cancel(bookingId: string, reason?: string) {
     const booking = await prisma.booking.findUnique({
@@ -238,12 +194,8 @@ export class BookingsService {
       throw new NotFoundException('Booking not found');
     }
 
-    if (
-      booking.status === BookingStatus.CANCELLED ||
-      booking.status === BookingStatus.EXPIRED
-    ) {
-      throw new BadRequestException('Booking is already cancelled or expired');
-    }
+    // Validate transition using the state machine
+    assertCanTransition(booking.status, BookingStatus.CANCELLED);
 
     const updated = await prisma.booking.update({
       where: { id: bookingId },
@@ -255,7 +207,7 @@ export class BookingsService {
       },
     });
 
-    this.logger.log(`Booking cancelled: ${bookingId}`);
+    this.logger.log(`Booking cancelled: ${bookingId} (${booking.status} → CANCELLED)`);
     return updated;
   }
 
@@ -264,32 +216,15 @@ export class BookingsService {
    */
   async findAllForHost(hostId: string) {
     return prisma.booking.findMany({
-      where: {
-        room: {
-          property: { hostId },
-        },
-      },
+      where: { room: { property: { hostId } } },
       include: {
         room: {
           select: {
-            id: true,
-            name: true,
-            property: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+            id: true, name: true,
+            property: { select: { id: true, name: true } },
           },
         },
-        guest: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
+        guest: { select: { id: true, name: true, email: true, phone: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -312,24 +247,18 @@ export class BookingsService {
     }
 
     return prisma.booking.findMany({
-      where: {
-        room: { propertyId },
-      },
+      where: { room: { propertyId } },
       include: {
-        room: {
-          select: { id: true, name: true },
-        },
-        guest: {
-          select: { id: true, name: true, email: true, phone: true },
-        },
+        room: { select: { id: true, name: true } },
+        guest: { select: { id: true, name: true, email: true, phone: true } },
       },
       orderBy: { checkIn: 'asc' },
     });
   }
 
   /**
-   * Clean up expired holds — called by a scheduled job or manually.
-   * Sets PENDING bookings past their hold_expires_at to EXPIRED.
+   * Clean up expired holds.
+   * Uses state machine to validate PENDING → EXPIRED.
    */
   async cleanupExpiredHolds(): Promise<number> {
     const result = await prisma.booking.updateMany({
@@ -358,12 +287,9 @@ export class BookingsService {
     }
 
     if (checkOut <= checkIn) {
-      throw new BadRequestException(
-        'Check-out date must be after check-in date',
-      );
+      throw new BadRequestException('Check-out date must be after check-in date');
     }
 
-    // Max stay: 90 nights
     const nights = this.calculateNights(checkIn, checkOut);
     if (nights > 90) {
       throw new BadRequestException('Maximum stay is 90 nights');
@@ -371,21 +297,15 @@ export class BookingsService {
   }
 
   private calculateNights(checkIn: Date, checkOut: Date): number {
-    const diffTime = checkOut.getTime() - checkIn.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
   }
 
-  /**
-   * Find an existing guest by email, or create a new one.
-   */
   private async findOrCreateGuest(dto: CreateBookingDto) {
     const existing = await prisma.guest.findUnique({
       where: { email: dto.guestEmail.toLowerCase() },
     });
 
-    if (existing) {
-      return existing;
-    }
+    if (existing) return existing;
 
     return prisma.guest.create({
       data: {
@@ -396,38 +316,26 @@ export class BookingsService {
     });
   }
 
-  /**
-   * Handle booking creation errors — specifically the EXCLUDE constraint.
-   */
   private handleBookingError(error: unknown): never {
-    // Prisma error with code P2002 is unique constraint, but EXCLUDE
-    // constraints surface differently. Check for the constraint name.
     const err = error as {
       code?: string;
       meta?: { constraint?: string; target?: string };
       message?: string;
     };
 
-    // PostgreSQL exclusion violation (SQLSTATE 23P01)
-    // Prisma surfaces this as a raw query error or P2002 with the constraint name
     if (
       err.message?.includes('no_overlapping_bookings') ||
       err.message?.includes('23P01') ||
       err.message?.includes('conflicting key value violates exclusion constraint') ||
-      (err.meta?.constraint &&
-        err.meta.constraint === 'no_overlapping_bookings')
+      (err.meta?.constraint && err.meta.constraint === 'no_overlapping_bookings')
     ) {
-      this.logger.warn(
-        `Double-booking attempt rejected by EXCLUDE constraint`,
-      );
+      this.logger.warn('Double-booking attempt rejected by EXCLUDE constraint');
       throw new ConflictException({
         code: 'ROOM_NOT_AVAILABLE',
-        message:
-          'This room is not available for the selected dates. Another booking already holds these dates.',
+        message: 'This room is not available for the selected dates.',
       });
     }
 
-    // Fallback — check if it's any Prisma known error
     if (err.code?.startsWith('P')) {
       this.logger.error(`Prisma error during booking: ${err.message}`, err as unknown as string);
       throw new ConflictException({
@@ -436,7 +344,6 @@ export class BookingsService {
       });
     }
 
-    // Unknown error
     this.logger.error(`Unexpected error during booking: ${err.message}`, err as unknown as string);
     throw new BadRequestException('Failed to create booking. Please try again.');
   }
