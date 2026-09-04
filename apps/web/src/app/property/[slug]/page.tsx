@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
+import { useAvailability } from '@/lib/use-availability';
+import { FaqChat } from '@/components/property/faq-chat';
 import type { Property, Room } from '@hbs/shared';
 
 type PropertyWithRooms = Property & { rooms: Room[] };
@@ -25,6 +27,7 @@ export default function PropertyDetailPage() {
 
   const [property, setProperty] = useState<PropertyWithRooms | null>(null);
   const [loading, setLoading] = useState(true);
+  const justHeldRoomIds = useAvailability(property?.id);
 
   useEffect(() => {
     loadProperty();
@@ -135,63 +138,88 @@ export default function PropertyDetailPage() {
               whileInView="visible"
               viewport={{ once: true, margin: '-80px' }}
             >
-              {property.rooms.map((room) => (
-                <motion.div key={room.id} variants={itemVariants} className="card p-6">
-                  <div className="flex flex-col sm:flex-row justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-surface-900 mb-1">{room.name}</h3>
-                      <p className="text-surface-600 text-sm mb-3">{room.description}</p>
-                      <div className="flex gap-4 text-sm text-surface-500 mb-3">
-                        <span>Capacity: {room.capacity} guests</span>
-                      </div>
-                      {room.amenities.length > 0 && (
-                        <div className="flex gap-2 flex-wrap">
-                          {room.amenities.map((amenity) => (
-                            <span
-                              key={amenity}
-                              className="px-3 py-1 bg-surface-100 rounded-full text-xs text-surface-600"
-                            >
-                              {amenity}
-                            </span>
-                          ))}
+              {property.rooms.map((room) => {
+                const justHeld = justHeldRoomIds.has(room.id);
+                return (
+                  <motion.div key={room.id} variants={itemVariants} className="card p-6">
+                    <div className="flex flex-col sm:flex-row justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-xl font-semibold text-surface-900">{room.name}</h3>
+                          <AnimatePresence>
+                            {justHeld && (
+                              <motion.span
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700"
+                              >
+                                Just booked
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
                         </div>
-                      )}
-                    </div>
-                    <div className="text-right sm:ml-6 flex sm:flex-col justify-between sm:justify-start items-end sm:items-end">
-                      <div>
-                        <p className="text-3xl font-bold text-brand-600">
-                          ₹{room.basePrice.toLocaleString('en-IN')}
-                        </p>
-                        <p className="text-surface-500 text-sm mb-3">per night</p>
+                        <p className="text-surface-600 text-sm mb-3">{room.description}</p>
+                        <div className="flex gap-4 text-sm text-surface-500 mb-3">
+                          <span>Capacity: {room.capacity} guests</span>
+                        </div>
+                        {room.amenities.length > 0 && (
+                          <div className="flex gap-2 flex-wrap">
+                            {room.amenities.map((amenity) => (
+                              <span
+                                key={amenity}
+                                className="px-3 py-1 bg-surface-100 rounded-full text-xs text-surface-600"
+                              >
+                                {amenity}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <button onClick={() => handleBookRoom(room)} className="btn-primary">
-                        Book now
-                      </button>
+                      <div className="text-right sm:ml-6 flex sm:flex-col justify-between sm:justify-start items-end sm:items-end">
+                        <div>
+                          <p className="text-3xl font-bold text-brand-600">
+                            ₹{room.basePrice.toLocaleString('en-IN')}
+                          </p>
+                          <p className="text-surface-500 text-sm mb-3">per night</p>
+                        </div>
+                        <button
+                          onClick={() => handleBookRoom(room)}
+                          disabled={justHeld}
+                          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {justHeld ? 'Unavailable' : 'Book now'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </motion.div>
           </div>
 
           {/* Sticky summary sidebar */}
           <div className="hidden lg:block">
-            <div className="sticky top-8 card p-6">
-              <h3 className="font-semibold text-surface-900 mb-4">About this stay</h3>
-              <dl className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-surface-500">Rooms available</dt>
-                  <dd className="font-medium text-surface-900">{property.rooms.length}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-surface-500">From</dt>
-                  <dd className="font-medium text-surface-900">
-                    ₹
-                    {Math.min(...property.rooms.map((r) => r.basePrice)).toLocaleString('en-IN')}
-                    /night
-                  </dd>
-                </div>
-              </dl>
+            <div className="sticky top-8 space-y-6">
+              <div className="card p-6">
+                <h3 className="font-semibold text-surface-900 mb-4">About this stay</h3>
+                <dl className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-surface-500">Rooms available</dt>
+                    <dd className="font-medium text-surface-900">{property.rooms.length}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-surface-500">From</dt>
+                    <dd className="font-medium text-surface-900">
+                      ₹
+                      {Math.min(...property.rooms.map((r) => r.basePrice)).toLocaleString('en-IN')}
+                      /night
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              <FaqChat propertyId={property.id} />
             </div>
           </div>
         </div>

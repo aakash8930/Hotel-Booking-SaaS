@@ -38,6 +38,7 @@ packages/prisma/prisma/migrations/
 
 # Go binary
 apps/realtime/bin/
+apps/realtime/realtime
 
 # Misc
 .turbo/

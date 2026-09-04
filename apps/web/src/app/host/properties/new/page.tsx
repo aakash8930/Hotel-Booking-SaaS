@@ -20,6 +20,30 @@ export default function NewPropertyPage() {
     status: 'ACTIVE',
   });
 
+  const [notes, setNotes] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [aiError, setAiError] = useState('');
+
+  async function handleGenerateDescription() {
+    if (!notes.trim()) return;
+    setGenerating(true);
+    setAiError('');
+
+    const res = await api.post<{ description: string }>('/ai/property-description', {
+      notes,
+      propertyName: form.name || undefined,
+      city: form.city || undefined,
+    });
+
+    if (res.success && res.data) {
+      const { description } = res.data;
+      setForm((f) => ({ ...f, description }));
+    } else {
+      setAiError(res.error?.message || 'Could not generate a description.');
+    }
+    setGenerating(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -55,6 +79,31 @@ export default function NewPropertyPage() {
             placeholder="Mountain View Homestay"
             required
           />
+        </div>
+
+        <div className="bg-surface-50 border border-surface-200 rounded-lg p-4">
+          <label className="block text-sm font-medium mb-2">
+            Rough notes <span className="text-surface-400 font-normal">(optional)</span>
+          </label>
+          <p className="text-xs text-surface-500 mb-2">
+            Jot down a few bullet points — views, vibe, what makes the place special — and
+            generate a polished description from them.
+          </p>
+          <textarea
+            className="input min-h-[70px] mb-2"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="mountain views, home-cooked breakfast, quiet, family-run, 10 min from the temple..."
+          />
+          <button
+            type="button"
+            onClick={handleGenerateDescription}
+            disabled={!notes.trim() || generating}
+            className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {generating ? 'Generating...' : 'Generate description with AI'}
+          </button>
+          {aiError && <p className="text-sm text-red-600 mt-2">{aiError}</p>}
         </div>
 
         <div>

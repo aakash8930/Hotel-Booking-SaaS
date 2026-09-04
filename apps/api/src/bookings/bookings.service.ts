@@ -10,6 +10,8 @@ import { prisma } from '@hbs/prisma';
 import { BookingStatus } from '@hbs/prisma';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 import { assertCanTransition } from '../common/booking-state';
+import { RealtimeService } from '../realtime/realtime.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 /** Duration of the soft-hold: 10 minutes to complete payment. */
 const HOLD_DURATION_MS = 10 * 60 * 1000;
@@ -17,6 +19,8 @@ const HOLD_DURATION_MS = 10 * 60 * 1000;
 @Injectable()
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
+
+  constructor(private readonly realtime: RealtimeService) {}
 
   /**
    * Create a new booking with a soft-hold.
@@ -99,6 +103,12 @@ export class BookingsService {
           `${checkIn.toISOString().slice(0, 10)} → ${checkOut.toISOString().slice(0, 10)} | ` +
           `Hold expires: ${holdExpiresAt.toISOString()}`,
       );
+
+      void this.realtime.publish('room.held', room.id, room.property.id, {
+        bookingId: booking.id,
+        checkIn: dto.checkIn,
+        checkOut: dto.checkOut,
+      });
 
       return { ...booking, nights, holdDurationMinutes: HOLD_DURATION_MS / 60_000 };
     } catch (error: unknown) {
@@ -188,6 +198,7 @@ export class BookingsService {
   async cancel(bookingId: string, reason?: string) {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
+      include: { room: { select: { id: true, propertyId: true } } },
     });
 
     if (!booking) {
@@ -208,6 +219,12 @@ export class BookingsService {
     });
 
     this.logger.log(`Booking cancelled: ${bookingId} (${booking.status} → CANCELLED)`);
+
+    void this.realtime.publish('room.released', booking.room.id, booking.room.propertyId, {
+      bookingId,
+      reason: 'cancelled',
+    });
+
     return updated;
   }
 
@@ -259,18 +276,38 @@ export class BookingsService {
   /**
    * Clean up expired holds.
    * Uses state machine to validate PENDING → EXPIRED.
+   *
+   * Runs automatically every minute (soft-hold duration is 10 minutes,
+   * so a 1-minute cadence keeps the staleness window small without
+   * hammering the database). The host-facing admin endpoint that calls
+   * this directly still works too, for manual/on-demand cleanup.
    */
+  @Cron(CronExpression.EVERY_MINUTE)
   async cleanupExpiredHolds(): Promise<number> {
-    const result = await prisma.booking.updateMany({
+    // updateMany doesn't return the affected rows, and each expired hold
+    // needs to publish a room.released event — so fetch first, then update.
+    const expired = await prisma.booking.findMany({
       where: {
         status: BookingStatus.PENDING,
         holdExpiresAt: { lt: new Date() },
       },
+      select: { id: true, room: { select: { id: true, propertyId: true } } },
+    });
+
+    if (expired.length === 0) return 0;
+
+    const result = await prisma.booking.updateMany({
+      where: { id: { in: expired.map((b) => b.id) } },
       data: { status: BookingStatus.EXPIRED },
     });
 
-    if (result.count > 0) {
-      this.logger.log(`Cleaned up ${result.count} expired booking holds`);
+    this.logger.log(`Cleaned up ${result.count} expired booking holds`);
+
+    for (const booking of expired) {
+      void this.realtime.publish('room.released', booking.room.id, booking.room.propertyId, {
+        bookingId: booking.id,
+        reason: 'expired',
+      });
     }
 
     return result.count;

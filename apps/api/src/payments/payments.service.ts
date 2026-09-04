@@ -29,6 +29,7 @@ import { randomUUID } from 'crypto';
 import { assertCanTransition, canTransition } from '../common/booking-state';
 import { PhonePeService } from './phonepe.service';
 import { EmailService } from './email.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 @Injectable()
 export class PaymentsService {
@@ -38,6 +39,7 @@ export class PaymentsService {
     private readonly phonepe: PhonePeService,
     private readonly config: ConfigService,
     private readonly email: EmailService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   /**
@@ -368,6 +370,17 @@ export class PaymentsService {
       this.logger.log(
         `Payment FAILED: ${paymentId} | Booking ${bookingId} → CANCELLED`,
       );
+
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: { room: { select: { id: true, propertyId: true } } },
+      });
+      if (booking) {
+        void this.realtime.publish('room.released', booking.room.id, booking.room.propertyId, {
+          bookingId,
+          reason: 'payment_failed',
+        });
+      }
 
       return { processed: true, message: 'Payment failed, booking cancelled' };
     } catch (error) {

@@ -10,7 +10,7 @@ Before you begin, ensure you have the following installed:
 
 - **Node.js 20+** — [Download](https://nodejs.org/)
 - **pnpm 9+** — `npm install -g pnpm`
-- **Go 1.22+** — [Download](https://go.dev/dl/)
+- **Go 1.24+** — [Download](https://go.dev/dl/)
 - **Docker & Docker Compose** — [Download](https://www.docker.com/products/docker-desktop)
 - **Git** — [Download](https://git-scm.com/)
 

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { PropertiesModule } from './properties/properties.module';
@@ -10,6 +11,8 @@ import { SearchModule } from './search/search.module';
 import { UploadModule } from './upload/upload.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './common/prisma.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -27,8 +30,12 @@ import { PrismaModule } from './common/prisma.module';
       },
     ]),
 
+    // Powers the @Cron job that auto-expires soft-holds
+    ScheduleModule.forRoot(),
+
     // Core
     PrismaModule,
+    RealtimeModule,
 
     // Feature modules
     AuthModule,
@@ -39,6 +46,7 @@ import { PrismaModule } from './common/prisma.module';
     SearchModule,
     UploadModule,
     PaymentsModule,
+    AiModule,
   ],
 })
 export class AppModule {}

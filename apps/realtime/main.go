@@ -3,15 +3,17 @@
 // booking events to connected browser clients.
 //
 // Architecture:
-//   NestJS API → publishes events to Redis → Go service → broadcasts to WebSocket clients
+//
+//	NestJS API → publishes events to Redis → Go service → broadcasts to WebSocket clients
 //
 // This is a separate service (not bolted onto NestJS) because:
-//   1. Go handles thousands of concurrent WebSocket connections efficiently
-//   2. Genuine concurrency use case — good for learning
-//   3. Keeps the API server focused on CRUD and business logic
+//  1. Go handles thousands of concurrent WebSocket connections efficiently
+//  2. Genuine concurrency use case — good for learning
+//  3. Keeps the API server focused on CRUD and business logic
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -21,6 +23,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
 )
 
 // ── Configuration ──────────────────────────────────────────────────────────
@@ -31,6 +34,11 @@ type Config struct {
 }
 
 func loadConfig() Config {
+	// Same root .env every other service in the monorepo reads from.
+	// Ignore the error — env vars set directly in the shell/deploy
+	// environment should still work if the file isn't present.
+	_ = godotenv.Load("../../.env", ".env")
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "4001"
@@ -51,28 +59,73 @@ func loadConfig() Config {
 
 // Hub maintains the set of active connections and broadcasts messages.
 type Hub struct {
-	mu          sync.RWMutex
-	clients     map[*Client]bool
-	register    chan *Client
-	unregister  chan *Client
-	broadcast   chan []byte
+	mu                sync.RWMutex
+	clients           map[*Client]bool
+	register          chan *Client
+	unregister        chan *Client
+	broadcast         chan []byte
+	broadcastTargeted chan *TargetedMessage
+}
+
+// TargetedMessage is delivered only to clients subscribed to PropertyID —
+// this is how a booking event for one property avoids fanning out to
+// every connected browser tab, most of which are looking at other
+// properties entirely.
+type TargetedMessage struct {
+	PropertyID string
+	Data       []byte
 }
 
 // Client represents a single WebSocket connection.
+//
+// subscriptions is written from this client's own readPump() goroutine
+// but read from the hub's run() goroutine on every targeted broadcast —
+// subMu guards it against the resulting concurrent map access.
 type Client struct {
 	hub  *Hub
 	conn *websocket.Conn
 	send chan []byte
-	// Room/property subscriptions for targeted broadcasts
+
+	subMu         sync.RWMutex
 	subscriptions map[string]bool
+}
+
+func (c *Client) isSubscribed(propertyID string) bool {
+	c.subMu.RLock()
+	defer c.subMu.RUnlock()
+	return c.subscriptions[propertyID]
+}
+
+func (c *Client) subscribe(propertyID string) {
+	c.subMu.Lock()
+	defer c.subMu.Unlock()
+	c.subscriptions[propertyID] = true
+}
+
+func (c *Client) unsubscribe(propertyID string) {
+	c.subMu.Lock()
+	defer c.subMu.Unlock()
+	delete(c.subscriptions, propertyID)
 }
 
 func newHub() *Hub {
 	return &Hub{
-		clients:    make(map[*Client]bool),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		broadcast:  make(chan []byte, 256),
+		clients:           make(map[*Client]bool),
+		register:          make(chan *Client),
+		unregister:        make(chan *Client),
+		broadcast:         make(chan []byte, 256),
+		broadcastTargeted: make(chan *TargetedMessage, 256),
+	}
+}
+
+// BroadcastToProperty sends a message to every client subscribed to the
+// given property ID. Non-blocking — if the hub's queue is full, the event
+// is dropped rather than stalling the Redis subscriber loop.
+func (h *Hub) BroadcastToProperty(propertyID string, data []byte) {
+	select {
+	case h.broadcastTargeted <- &TargetedMessage{PropertyID: propertyID, Data: data}:
+	default:
+		log.Printf("broadcastTargeted queue full, dropping event for property %s", propertyID)
 	}
 }
 
@@ -101,6 +154,25 @@ func (h *Hub) run() {
 				case client.send <- message:
 				default:
 					// Client can't keep up — drop the connection
+					h.mu.RUnlock()
+					h.mu.Lock()
+					delete(h.clients, client)
+					close(client.send)
+					h.mu.Unlock()
+					h.mu.RLock()
+				}
+			}
+			h.mu.RUnlock()
+
+		case tm := <-h.broadcastTargeted:
+			h.mu.RLock()
+			for client := range h.clients {
+				if !client.isSubscribed(tm.PropertyID) {
+					continue
+				}
+				select {
+				case client.send <- tm.Data:
+				default:
 					h.mu.RUnlock()
 					h.mu.Lock()
 					delete(h.clients, client)
@@ -190,10 +262,10 @@ func (c *Client) readPump() {
 
 		switch subMsg.Action {
 		case "subscribe":
-			c.subscriptions[subMsg.PropertyID] = true
+			c.subscribe(subMsg.PropertyID)
 			log.Printf("Client subscribed to property: %s", subMsg.PropertyID)
 		case "unsubscribe":
-			delete(c.subscriptions, subMsg.PropertyID)
+			c.unsubscribe(subMsg.PropertyID)
 			log.Printf("Client unsubscribed from property: %s", subMsg.PropertyID)
 		}
 	}
@@ -264,9 +336,9 @@ func main() {
 	// Health check
 	http.HandleFunc("/health", healthHandler)
 
-	// TODO: Redis pub/sub subscriber
-	// In Phase 1, connect to Redis and forward published events to the hub.
-	// For now, the service accepts WebSocket connections and handles subscriptions.
+	// Redis pub/sub subscriber — forwards booking events published by the
+	// NestJS API to any WebSocket client subscribed to the affected property.
+	go subscribeAvailability(context.Background(), hub, cfg.RedisURL)
 
 	addr := fmt.Sprintf("0.0.0.0:%s", cfg.Port)
 	log.Printf("🚀 Realtime service starting on %s", addr)
