@@ -3,11 +3,17 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { initSentry } from './common/sentry';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
+
+  initSentry(
+    config.get<string>('SENTRY_DSN'),
+    config.get<string>('NODE_ENV', 'development'),
+  );
 
   // Global exception filter — normalizes all errors into { success, error } shape
   app.useGlobalFilters(new AllExceptionsFilter());

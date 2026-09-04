@@ -43,6 +43,11 @@ enum PropertyStatus {
   SUSPENDED
 }
 
+enum BillingPlan {
+  COMMISSION   // Platform takes a % of each booking's total
+  SUBSCRIPTION // Host pays a flat recurring fee, 0% commission
+}
+
 // ── Hosts (property owners) ─────────────────────────────────────────────────
 
 model Host {
@@ -56,6 +61,18 @@ model Host {
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // ── Billing plan ──────────────────────────────────────────────────────
+  // Host-selectable: pay per booking (commission) or a flat recurring fee
+  // (subscription). Rates are configurable per host so early hosts can be
+  // offered different terms than later ones without a schema change.
+  // NOTE: this models and computes the platform's fee; it does not yet
+  // *collect* it — no host payout/billing infra exists at pilot stage
+  // (see BillingService for the reasoning).
+  billingPlan      BillingPlan @default(COMMISSION) @map("billing_plan")
+  commissionRate   Decimal     @default(10.00) @db.Decimal(5, 2) @map("commission_rate")
+  subscriptionFee  Decimal     @default(999.00) @db.Decimal(10, 2) @map("subscription_fee")
+  billingPlanSetAt DateTime?   @map("billing_plan_set_at")
 
   properties Property[]
   refreshToken RefreshToken[]

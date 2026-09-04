@@ -64,7 +64,7 @@ export class BookingsService {
     const holdExpiresAt = new Date(Date.now() + HOLD_DURATION_MS);
 
     try {
-      const booking = await prisma.booking.create({
+      const booking = await this.createBookingWithDeadlockRetry({
         data: {
           roomId: dto.roomId,
           guestId: guest.id,
@@ -232,19 +232,35 @@ export class BookingsService {
    * Get all bookings for a host's properties.
    */
   async findAllForHost(hostId: string) {
-    return prisma.booking.findMany({
-      where: { room: { property: { hostId } } },
-      include: {
-        room: {
-          select: {
-            id: true, name: true,
-            property: { select: { id: true, name: true } },
+    const [host, bookings] = await Promise.all([
+      prisma.host.findUnique({
+        where: { id: hostId },
+        select: { billingPlan: true, commissionRate: true },
+      }),
+      prisma.booking.findMany({
+        where: { room: { property: { hostId } } },
+        include: {
+          room: {
+            select: {
+              id: true, name: true,
+              property: { select: { id: true, name: true } },
+            },
           },
+          guest: { select: { id: true, name: true, email: true, phone: true } },
         },
-        guest: { select: { id: true, name: true, email: true, phone: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    // Platform fee is computed and shown here, not yet collected — see
+    // BillingService for why automated collection is deferred at pilot stage.
+    return bookings.map((booking) => ({
+      ...booking,
+      platformFee:
+        host?.billingPlan === 'COMMISSION'
+          ? Math.round(Number(booking.totalPrice) * (Number(host.commissionRate) / 100) * 100) / 100
+          : 0,
+    }));
   }
 
   /**
@@ -351,6 +367,35 @@ export class BookingsService {
         phone: dto.guestPhone ?? null,
       },
     });
+  }
+
+  /**
+   * Under heavy concurrent contention for the same room/dates, Postgres can
+   * report a genuine deadlock (40P01) while several transactions race to
+   * take locks for the EXCLUDE constraint's overlap check — distinct from an
+   * exclusion violation, which is deterministic and not retryable. A
+   * deadlock just means Postgres broke a lock cycle by aborting one of the
+   * colliding transactions arbitrarily; a short retry resolves it without
+   * changing who ultimately wins the room. Verified under real load in
+   * apps/api/test/concurrency-load.test.ts.
+   */
+  private async createBookingWithDeadlockRetry(
+    args: Parameters<typeof prisma.booking.create>[0],
+    attempt = 1,
+  ): Promise<Awaited<ReturnType<typeof prisma.booking.create>>> {
+    try {
+      return await prisma.booking.create(args);
+    } catch (error: unknown) {
+      const message = (error as { message?: string }).message ?? '';
+      const isDeadlock = message.includes('40P01') || message.includes('deadlock detected');
+
+      if (isDeadlock && attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 20 + Math.random() * 60));
+        return this.createBookingWithDeadlockRetry(args, attempt + 1);
+      }
+
+      throw error;
+    }
   }
 
   private handleBookingError(error: unknown): never {

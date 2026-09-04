@@ -13,6 +13,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './common/prisma.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { AiModule } from './ai/ai.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { AiModule } from './ai/ai.module';
     UploadModule,
     PaymentsModule,
     AiModule,
+    BillingModule,
   ],
 })
 export class AppModule {}

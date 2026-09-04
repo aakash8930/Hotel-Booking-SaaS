@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { SmoothScroll } from '@/components/animations/smooth-scroll';
+import { Footer } from '@/components/layout/footer';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -51,8 +52,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
-      <body className="font-sans">
-        <SmoothScroll>{children}</SmoothScroll>
+      <body className="font-sans flex flex-col min-h-screen">
+        <SmoothScroll>
+          <div className="flex-1">{children}</div>
+          <Footer />
+        </SmoothScroll>
       </body>
     </html>
   );

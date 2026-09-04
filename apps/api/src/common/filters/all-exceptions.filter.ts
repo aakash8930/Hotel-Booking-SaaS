@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as Sentry from '@sentry/node';
 
 /**
  * Global exception filter — normalizes all errors into a consistent
@@ -67,6 +68,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `${request.method} ${request.url} → ${status}: ${exception.message}`,
         exception.stack,
       );
+    }
+
+    // Only genuine server errors go to Sentry — routine 4xx (validation,
+    // not-found, a room legitimately unavailable) are expected traffic,
+    // not incidents, and would drown out real signal.
+    if (status >= 500) {
+      Sentry.captureException(exception);
     }
 
     response.status(status).json({

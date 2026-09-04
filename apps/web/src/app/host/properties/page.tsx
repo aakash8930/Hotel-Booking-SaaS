@@ -37,12 +37,20 @@ export default function HostPropertiesPage() {
     <div className="p-8 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">My Properties</h1>
-        <button
-          onClick={() => router.push('/host/properties/new')}
-          className="btn-primary"
-        >
-          + Add Property
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => router.push('/host/billing')}
+            className="btn-secondary"
+          >
+            Billing
+          </button>
+          <button
+            onClick={() => router.push('/host/properties/new')}
+            className="btn-primary"
+          >
+            + Add Property
+          </button>
+        </div>
       </div>
 
       {properties.length === 0 ? (

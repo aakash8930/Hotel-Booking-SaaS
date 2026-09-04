@@ -16,6 +16,7 @@
     "test:booking": "tsx apps/api/test/booking-flow.test.ts",
     "test:phase2": "tsx apps/api/test/phase2-payments.test.ts",
     "test:realtime": "tsx apps/api/test/realtime-availability.test.ts",
+    "test:load": "tsx apps/api/test/concurrency-load.test.ts",
     "dev:realtime": "cd apps/realtime && go run .",
     "fix:constraint": "tsx scripts/fix-exclude-constraint.ts",
     "db:generate": "pnpm --filter @hbs/prisma generate",
