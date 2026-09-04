@@ -1,0 +1,226 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Hotel Booking SaaS — Prisma Schema
+// PostgreSQL with EXCLUDE constraint for double-booking prevention
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  HOST
+  GUEST
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING    // Soft hold — 10-min checkout timer running
+  CONFIRMED  // Payment initiated
+  PAID       // Payment verified
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  EXPIRED    // Hold timed out, auto-cancelled by job
+}
+
+enum PaymentStatus {
+  INITIATED
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum PropertyStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+}
+
+enum BillingPlan {
+  COMMISSION   // Platform takes a % of each booking's total
+  SUBSCRIPTION // Host pays a flat recurring fee, 0% commission
+}
+
+// ── Hosts (property owners) ─────────────────────────────────────────────────
+
+model Host {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  phone        String?
+  businessName String?  @map("business_name")
+  avatarUrl    String?  @map("avatar_url")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // ── Billing plan ──────────────────────────────────────────────────────
+  // Host-selectable: pay per booking (commission) or a flat recurring fee
+  // (subscription). Rates are configurable per host so early hosts can be
+  // offered different terms than later ones without a schema change.
+  // NOTE: this models and computes the platform's fee; it does not yet
+  // *collect* it — no host payout/billing infra exists at pilot stage
+  // (see BillingService for the reasoning).
+  billingPlan      BillingPlan @default(COMMISSION) @map("billing_plan")
+  commissionRate   Decimal     @default(10.00) @db.Decimal(5, 2) @map("commission_rate")
+  subscriptionFee  Decimal     @default(999.00) @db.Decimal(10, 2) @map("subscription_fee")
+  billingPlanSetAt DateTime?   @map("billing_plan_set_at")
+
+  properties Property[]
+  refreshToken RefreshToken[]
+
+  @@map("hosts")
+}
+
+// ── Properties (hotels / homestays) ─────────────────────────────────────────
+
+model Property {
+  id          String         @id @default(uuid()) @db.Uuid
+  hostId      String         @map("host_id") @db.Uuid
+  name        String
+  slug        String         @unique
+  description String?
+  address     String
+  city        String
+  state       String
+  pincode     String
+  latitude    Decimal?       @db.Decimal(10, 8)
+  longitude   Decimal?       @db.Decimal(11, 8)
+  coverImage  String?        @map("cover_image")
+  status      PropertyStatus @default(DRAFT)
+  checkInTime  String?       @default("14:00") @map("check_in_time")
+  checkOutTime String?       @default("11:00") @map("check_out_time")
+  rules        String?       // JSON blob: house rules, policies
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  host  Host   @relation(fields: [hostId], references: [id])
+  rooms Room[]
+
+  @@index([hostId])
+  @@index([city, state])
+  @@map("properties")
+}
+
+// ── Rooms ───────────────────────────────────────────────────────────────────
+
+model Room {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @map("property_id") @db.Uuid
+  name         String
+  description  String?
+  capacity     Int      @default(2)
+  basePrice    Decimal  @map("base_price") @db.Decimal(10, 2)
+  currency     String   @default("INR")
+  images       String[] // Array of R2 URLs
+  amenities    String[] // e.g. ["wifi", "ac", "breakfast"]
+  isActive     Boolean  @default(true) @map("is_active")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  property Property @relation(fields: [propertyId], references: [id])
+  bookings Booking[]
+
+  @@index([propertyId])
+  @@map("rooms")
+}
+
+// ── Guests ──────────────────────────────────────────────────────────────────
+
+model Guest {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  name      String
+  phone     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  bookings Booking[]
+
+  @@map("guests")
+}
+
+// ── Bookings (the critical table) ───────────────────────────────────────────
+//
+// The EXCLUDE constraint (applied via raw SQL migration) makes overlapping
+// active bookings for the same room structurally impossible:
+//
+//   EXCLUDE USING gist (room_id WITH =, stay_range WITH &&)
+//   WHERE (status IN ('pending', 'confirmed', 'paid', 'checked_in'))
+//
+// Prisma doesn't natively support EXCLUDE constraints, so this is defined
+// as a table-level constraint in a custom migration. Prisma sees the table
+// shape but not the constraint itself — that lives in raw SQL.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Booking {
+  id             String        @id @default(uuid()) @db.Uuid
+  room           Room          @relation(fields: [roomId], references: [id])
+  roomId         String        @map("room_id") @db.Uuid
+  guest          Guest         @relation(fields: [guestId], references: [id])
+  guestId        String        @map("guest_id") @db.Uuid
+  checkIn        DateTime      @map("check_in") @db.Date
+  checkOut       DateTime      @map("check_out") @db.Date
+  guests         Int           @default(1)
+  status         BookingStatus @default(PENDING)
+  holdExpiresAt  DateTime?     @map("hold_expires_at") @db.Timestamptz()
+  totalPrice     Decimal       @map("total_price") @db.Decimal(10, 2)
+  currency       String        @default("INR")
+  specialRequests String?      @map("special_requests")
+  cancelledAt    DateTime?     @map("cancelled_at")
+  cancellationReason String?   @map("cancellation_reason")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  payments Payment[]
+
+  @@index([roomId, status])
+  @@index([guestId])
+  @@index([holdExpiresAt])
+  @@map("bookings")
+}
+
+// ── Payments ────────────────────────────────────────────────────────────────
+
+model Payment {
+  id               String        @id @default(uuid()) @db.Uuid
+  booking          Booking       @relation(fields: [bookingId], references: [id])
+  bookingId        String        @map("booking_id") @db.Uuid
+  amount           Decimal       @db.Decimal(10, 2)
+  currency         String        @default("INR")
+  status           PaymentStatus @default(INITIATED)
+  provider         String        @default("phonepe")
+  providerTxnId    String?       @unique @map("provider_txn_id")
+  providerResponse Json?         @map("provider_response")
+  upiId            String?       @map("upi_id") // masked for privacy
+  initiatedAt      DateTime      @default(now()) @map("initiated_at")
+  completedAt      DateTime?     @map("completed_at")
+
+  @@index([bookingId])
+  @@index([providerTxnId])
+  @@map("payments")
+}
+
+// ── Refresh Tokens (JWT rotation) ───────────────────────────────────────────
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  host      Host     @relation(fields: [hostId], references: [id])
+  hostId    String   @map("host_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([hostId])
+  @@map("refresh_tokens")
+}

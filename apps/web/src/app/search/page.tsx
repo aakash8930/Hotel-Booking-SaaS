@@ -1,0 +1,163 @@
+'use client';
+
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { api } from '@/lib/api';
+import type { Property, Room } from '@hbs/shared';
+
+type PropertyWithRooms = Property & { rooms: Room[] };
+
+interface SearchResponse {
+  properties: PropertyWithRooms[];
+  search: {
+    checkIn: string;
+    checkOut: string;
+    guests: number | null;
+    city: string | null;
+    state: string | null;
+    nights: number;
+  };
+  total: number;
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.08 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+};
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <SearchResults />
+    </Suspense>
+  );
+}
+
+function SearchResults() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [results, setResults] = useState<PropertyWithRooms[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const city = searchParams.get('city') || '';
+  const checkIn = searchParams.get('checkIn') || '';
+  const checkOut = searchParams.get('checkOut') || '';
+  const guests = searchParams.get('guests') || '2';
+
+  useEffect(() => {
+    if (city && checkIn && checkOut) {
+      loadResults();
+    } else {
+      setLoading(false);
+    }
+  }, [city, checkIn, checkOut, guests]);
+
+  async function loadResults() {
+    setLoading(true);
+    const res = await api.get<SearchResponse>(
+      `/search?city=${city}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}`,
+    );
+    if (res.success && res.data) {
+      setResults(res.data.properties);
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div className="container-custom py-12">
+      <div className="mb-10">
+        <h1 className="font-display text-3xl md:text-4xl font-bold text-surface-900 mb-2">
+          {city ? `Stays in ${city}` : 'Search results'}
+        </h1>
+        <p className="text-surface-500">
+          {checkIn} → {checkOut} · {guests} guest{guests !== '1' ? 's' : ''}
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="grid gap-6">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="card p-6 animate-pulse">
+              <div className="flex gap-6">
+                <div className="w-48 h-32 bg-surface-200 rounded-lg shrink-0" />
+                <div className="flex-1 space-y-3 py-1">
+                  <div className="h-5 bg-surface-200 rounded w-1/3" />
+                  <div className="h-4 bg-surface-100 rounded w-1/4" />
+                  <div className="h-4 bg-surface-100 rounded w-2/3" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : results.length === 0 ? (
+        <div className="text-center py-24">
+          <p className="text-surface-500 mb-4">No properties found for your search.</p>
+          <button onClick={() => router.push('/')} className="btn-primary">
+            Try a different search
+          </button>
+        </div>
+      ) : (
+        <motion.div
+          className="grid gap-6"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {results.map((property) => (
+            <motion.div
+              key={property.id}
+              variants={itemVariants}
+              whileHover={{ y: -4 }}
+              transition={{ duration: 0.2 }}
+              className="card p-6 cursor-pointer"
+              onClick={() => router.push(`/property/${property.slug}`)}
+            >
+              <div className="flex flex-col sm:flex-row gap-6">
+                <div className="w-full sm:w-48 h-32 rounded-lg shrink-0 bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 flex items-center justify-center overflow-hidden relative">
+                  <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_30%_20%,white,transparent_50%)]" />
+                  <span className="relative text-white/90 font-display text-lg">
+                    {property.city}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-semibold text-surface-900 mb-1">
+                    {property.name}
+                  </h2>
+                  <p className="text-surface-500 text-sm mb-2">
+                    {property.city}, {property.state}
+                  </p>
+                  <p className="text-surface-600 text-sm mb-4 line-clamp-2">
+                    {property.description}
+                  </p>
+                  <div className="flex gap-4 text-sm text-surface-500">
+                    <span>Check-in: {property.checkInTime}</span>
+                    <span>Check-out: {property.checkOutTime}</span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  {property.rooms[0] && (
+                    <>
+                      <p className="text-2xl font-bold text-brand-600">
+                        ₹{property.rooms[0].basePrice.toLocaleString('en-IN')}
+                      </p>
+                      <p className="text-surface-500 text-sm">per night</p>
+                    </>
+                  )}
+                  <p className="text-green-600 text-sm mt-2">
+                    {property.rooms.length} room{property.rooms.length !== 1 ? 's' : ''} available
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
+    </div>
+  );
+}

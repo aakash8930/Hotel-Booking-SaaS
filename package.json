@@ -1,0 +1,37 @@
+{
+  "name": "hotel-booking-saas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Booking + UPI payments SaaS for independent hotels and homestays in India",
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "dev:api": "pnpm --filter @hbs/api dev",
+    "dev:web": "pnpm --filter @hbs/web dev",
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter @hbs/api build",
+    "build:web": "pnpm --filter @hbs/web build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:exclude": "tsx apps/api/test/exclude-constraint.test.ts",
+    "test:booking": "tsx apps/api/test/booking-flow.test.ts",
+    "test:phase2": "tsx apps/api/test/phase2-payments.test.ts",
+    "test:realtime": "tsx apps/api/test/realtime-availability.test.ts",
+    "test:load": "tsx apps/api/test/concurrency-load.test.ts",
+    "dev:realtime": "cd apps/realtime && go run .",
+    "fix:constraint": "tsx scripts/fix-exclude-constraint.ts",
+    "db:generate": "pnpm --filter @hbs/prisma generate",
+    "db:migrate": "pnpm --filter @hbs/prisma migrate",
+    "db:push": "pnpm --filter @hbs/prisma push",
+    "db:studio": "pnpm --filter @hbs/prisma studio",
+    "db:seed": "pnpm --filter @hbs/prisma seed"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "dotenv": "^16.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.4"
+}
