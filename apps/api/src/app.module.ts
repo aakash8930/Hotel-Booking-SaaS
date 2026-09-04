@@ -14,6 +14,10 @@ import { PrismaModule } from './common/prisma.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { AiModule } from './ai/ai.module';
 import { BillingModule } from './billing/billing.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { PayoutsModule } from './payouts/payouts.module';
+import { AdminModule } from './admin/admin.module';
+import { InvoicesModule } from './invoices/invoices.module';
 
 @Module({
   imports: [
@@ -49,6 +53,10 @@ import { BillingModule } from './billing/billing.module';
     PaymentsModule,
     AiModule,
     BillingModule,
+    ReviewsModule,
+    PayoutsModule,
+    AdminModule,
+    InvoicesModule,
   ],
 })
 export class AppModule {}

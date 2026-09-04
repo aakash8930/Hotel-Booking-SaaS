@@ -23,8 +23,9 @@ export function SearchCTA() {
   };
 
   return (
-    <section id="search" className="section bg-gradient-to-br from-brand-50 to-surface-50">
-      <div className="container-custom">
+    <section id="search" className="section relative overflow-hidden bg-surface-100 border-t border-surface-200">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_50%_at_50%_50%,rgba(212,132,30,0.08),transparent)]" />
+      <div className="container-custom relative">
         <motion.div
           className="max-w-4xl mx-auto"
           initial={{ opacity: 0, y: 30 }}
@@ -43,7 +44,7 @@ export function SearchCTA() {
 
           <form
             onSubmit={handleSearch}
-            className="card p-6 md:p-8 shadow-lg"
+            className="card p-6 md:p-8 shadow-glow"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div>

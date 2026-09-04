@@ -16,6 +16,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
+import type { PaymentMethod } from '@hbs/prisma';
+
+/** Maps our PaymentMethod enum to PhonePe's paymentInstrument.type values. */
+const INSTRUMENT_TYPE: Record<PaymentMethod, string> = {
+  UPI: 'UPI_INTENT',
+  CARD: 'CARD',
+  NETBANKING: 'NET_BANKING',
+  WALLET: 'WALLET',
+};
 
 export interface PhonePeInitiateResponse {
   redirectUrl: string;
@@ -28,6 +37,12 @@ export interface PhonePeStatusResponse {
   transactionId: string;
   amount: number;
   state: 'COMPLETED' | 'FAILED' | 'PENDING';
+}
+
+export interface PhonePeRefundResponse {
+  success: boolean;
+  refundTransactionId: string;
+  state: 'PENDING' | 'CONFIRMED' | 'FAILED';
 }
 
 @Injectable()
@@ -59,14 +74,18 @@ export class PhonePeService {
     guestName: string;
     guestEmail: string;
     guestPhone?: string;
+    method?: PaymentMethod;
   }): Promise<PhonePeInitiateResponse> {
     const merchantId = this.config.get<string>('PHONEPE_MERCHANT_ID', 'TEST_MERCHANT');
+    const method = params.method ?? ('UPI' as PaymentMethod);
 
     if (this.isSandbox) {
       // Sandbox mode — return a mock redirect URL. callbackUrl may already
       // carry its own query string (e.g. ?paymentId=...), so append with
       // the correct separator instead of assuming a bare URL.
-      this.logger.log(`[SANDBOX] Payment initiated: ${params.transactionId} (₹${params.amount / 100})`);
+      this.logger.log(
+        `[SANDBOX] Payment initiated: ${params.transactionId} via ${method} (₹${params.amount / 100})`,
+      );
       const separator = params.callbackUrl.includes('?') ? '&' : '?';
       return {
         redirectUrl: `${params.callbackUrl}${separator}transactionId=${params.transactionId}&status=SUCCESS`,
@@ -91,7 +110,7 @@ export class PhonePeService {
       redirectUrl: params.callbackUrl,
       redirectMode: 'REDIRECT',
       callbackUrl: params.webhookUrl,
-      paymentInstrument: { type: 'PAY_PAGE' },
+      paymentInstrument: { type: INSTRUMENT_TYPE[method] },
     };
 
     const payloadStr = Buffer.from(JSON.stringify(payload)).toString('base64');
@@ -178,6 +197,80 @@ export class PhonePeService {
         success: false,
         transactionId,
         amount: 0,
+        state: 'FAILED',
+      };
+    }
+  }
+
+  /**
+   * Initiate a refund with PhonePe for a previously successful transaction.
+   *
+   * Real PhonePe refunds are async — CONFIRMED doesn't land immediately,
+   * PhonePe settles it and notifies via webhook (not implemented here,
+   * matching the rest of this project's pilot-stage scope: the refund
+   * ledger entry — Payment.refundedAmount/refundTxnId — is what's
+   * authoritative for this app, same as PhonePe's real behavior where the
+   * refund transaction is tracked separately from the original payment).
+   */
+  async initiateRefund(params: {
+    originalTransactionId: string;
+    refundTransactionId: string;
+    amount: number; // in paise
+  }): Promise<PhonePeRefundResponse> {
+    const merchantId = this.config.get<string>('PHONEPE_MERCHANT_ID', 'TEST_MERCHANT');
+
+    if (this.isSandbox) {
+      this.logger.log(
+        `[SANDBOX] Refund initiated: ${params.refundTransactionId} for ` +
+          `${params.originalTransactionId} (₹${params.amount / 100})`,
+      );
+      return {
+        success: true,
+        refundTransactionId: params.refundTransactionId,
+        state: 'CONFIRMED',
+      };
+    }
+
+    const saltKey = this.config.get<string>('PHONEPE_SALT_KEY', '');
+    const saltIndex = this.config.get<string>('PHONEPE_SALT_INDEX', '1');
+    const baseUrl = this.config.get<string>(
+      'PHONEPE_BASE_URL',
+      'https://api.phonepe.com/apis/hermes',
+    );
+
+    const payload = {
+      merchantId,
+      merchantTransactionId: params.refundTransactionId,
+      originalTransactionId: params.originalTransactionId,
+      amount: params.amount,
+      callbackUrl: '',
+    };
+
+    const payloadStr = Buffer.from(JSON.stringify(payload)).toString('base64');
+    const checksum = this.generateChecksum(`${payloadStr}/pg/v1/refund${saltKey}`, saltIndex);
+
+    try {
+      const response = await fetch(`${baseUrl}/pg/v1/refund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VERIFY': checksum,
+        },
+        body: JSON.stringify({ request: payloadStr }),
+      });
+
+      const data = (await response.json()) as any;
+
+      return {
+        success: !!data.success,
+        refundTransactionId: params.refundTransactionId,
+        state: data.success ? 'PENDING' : 'FAILED',
+      };
+    } catch (error) {
+      this.logger.error(`PhonePe refund failed: ${(error as Error).message}`);
+      return {
+        success: false,
+        refundTransactionId: params.refundTransactionId,
         state: 'FAILED',
       };
     }

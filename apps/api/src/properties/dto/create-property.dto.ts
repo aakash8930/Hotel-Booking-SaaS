@@ -73,4 +73,8 @@ export class CreatePropertyDto {
 
   @IsOptional()
   rules?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsEnum(['FLEXIBLE', 'MODERATE', 'STRICT'])
+  cancellationPolicy?: 'FLEXIBLE' | 'MODERATE' | 'STRICT';
 }

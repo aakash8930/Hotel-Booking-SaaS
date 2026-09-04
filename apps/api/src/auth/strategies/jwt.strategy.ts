@@ -7,6 +7,7 @@ interface JwtPayload {
   sub: string;
   email: string;
   type: string;
+  role: 'host' | 'guest' | 'admin';
 }
 
 @Injectable()
@@ -28,6 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       sub: payload.sub,
       email: payload.email,
+      role: payload.role,
     };
   }
 }

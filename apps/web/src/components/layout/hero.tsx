@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { useHostSession } from '@/lib/host-session';
 
 /**
  * Animated hero section with GSAP scroll-scrub potential.
@@ -9,6 +10,8 @@ import { motion } from 'framer-motion';
  */
 export function Hero() {
   const heroRef = useRef<HTMLDivElement>(null);
+  const { isLoggedIn: isHostLoggedIn } = useHostSession();
+  const hostCtaHref = isHostLoggedIn ? '/host/properties' : '/host/register';
 
   useEffect(() => {
     // GSAP animation setup — will be expanded with scroll-scrubbed effects
@@ -49,12 +52,21 @@ export function Hero() {
       ref={heroRef}
       className="relative min-h-screen flex items-center justify-center overflow-hidden"
     >
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-surface-50 to-brand-100" />
+      {/* Background */}
+      <div className="absolute inset-0 bg-surface-50" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(212,132,30,0.16),transparent)]" />
+      <div
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+          backgroundSize: '64px 64px',
+        }}
+      />
 
-      {/* Decorative elements */}
-      <div className="absolute top-20 left-10 w-72 h-72 bg-brand-200/30 rounded-full blur-3xl" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-brand-300/20 rounded-full blur-3xl" />
+      {/* Decorative glow orbs */}
+      <div className="absolute top-24 left-10 w-72 h-72 bg-brand-500/20 rounded-full blur-3xl animate-glow-pulse" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-brand-600/15 rounded-full blur-3xl animate-glow-pulse" style={{ animationDelay: '1.5s' }} />
 
       {/* Content */}
       <div className="relative z-10 container-custom text-center max-w-4xl mx-auto px-4">
@@ -67,8 +79,8 @@ export function Hero() {
           <span className="text-gradient">truly local</span>
         </motion.h1>
 
-        <p className="hero-subtitle text-xl md:text-2xl text-surface-600 mb-10 max-w-2xl mx-auto">
-          Discover handpicked homestays and independent hotels across India. 
+        <p className="hero-subtitle text-xl md:text-2xl text-surface-600 mb-10 max-w-2xl mx-auto text-balance">
+          Discover handpicked homestays and independent hotels across India.
           Book instantly with UPI — no middlemen, no hidden fees.
         </p>
 
@@ -76,7 +88,7 @@ export function Hero() {
           <a href="#search" className="btn-primary text-lg px-8 py-4">
             Find your stay
           </a>
-          <a href="/host/properties" className="btn-secondary text-lg px-8 py-4">
+          <a href={hostCtaHref} className="btn-secondary text-lg px-8 py-4">
             List your property
           </a>
         </div>

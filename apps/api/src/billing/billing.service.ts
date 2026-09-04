@@ -33,6 +33,7 @@ export class BillingService {
         commissionRate: true,
         subscriptionFee: true,
         billingPlanSetAt: true,
+        gstin: true,
       },
     });
 
@@ -41,6 +42,14 @@ export class BillingService {
     }
 
     return host;
+  }
+
+  async setGstin(hostId: string, gstin: string | null) {
+    return prisma.host.update({
+      where: { id: hostId },
+      data: { gstin },
+      select: { gstin: true },
+    });
   }
 
   async setPlan(hostId: string, billingPlan: BillingPlan) {

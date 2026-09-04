@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { FieldLabel } from '@/components/ui/input';
 import type { Booking } from '@hbs/shared';
 
 export default function BookingPage() {
@@ -44,21 +46,23 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Complete Your Booking</h1>
+    <div className="container-custom pt-28 pb-16 md:pt-32 max-w-2xl">
+      <h1 className="font-display text-3xl md:text-4xl font-bold mb-8 text-surface-900">
+        Complete your booking
+      </h1>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl mb-6">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="card p-6 md:p-8 space-y-8">
         <div>
-          <h2 className="text-xl font-semibold mb-4">Your Details</h2>
+          <h2 className="text-xl font-semibold mb-4 text-surface-900">Your details</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Full Name</label>
+              <FieldLabel>Full name</FieldLabel>
               <input
                 type="text"
                 className="input"
@@ -68,7 +72,7 @@ export default function BookingPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Email</label>
+              <FieldLabel>Email</FieldLabel>
               <input
                 type="email"
                 className="input"
@@ -78,7 +82,7 @@ export default function BookingPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Phone</label>
+              <FieldLabel>Phone</FieldLabel>
               <input
                 type="tel"
                 className="input"
@@ -91,11 +95,11 @@ export default function BookingPage() {
         </div>
 
         <div>
-          <h2 className="text-xl font-semibold mb-4">Stay Details</h2>
+          <h2 className="text-xl font-semibold mb-4 text-surface-900">Stay details</h2>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Check-in</label>
+                <FieldLabel>Check-in</FieldLabel>
                 <input
                   type="date"
                   className="input"
@@ -105,7 +109,7 @@ export default function BookingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Check-out</label>
+                <FieldLabel>Check-out</FieldLabel>
                 <input
                   type="date"
                   className="input"
@@ -116,7 +120,7 @@ export default function BookingPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Number of Guests</label>
+              <FieldLabel>Number of Guests</FieldLabel>
               <input
                 type="number"
                 className="input"
@@ -128,7 +132,7 @@ export default function BookingPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Special Requests (optional)</label>
+              <FieldLabel>Special Requests (optional)</FieldLabel>
               <textarea
                 className="input"
                 value={formData.specialRequests}
@@ -140,39 +144,31 @@ export default function BookingPage() {
           </div>
         </div>
 
-        <div className="bg-surface-50 border border-surface-200 rounded-lg p-6">
-          <h3 className="font-semibold mb-3">Booking Summary</h3>
+        <div className="bg-surface-200/50 border border-surface-300 rounded-xl p-6">
+          <h3 className="font-semibold mb-3 text-surface-900">Booking summary</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-surface-600">Check-in:</span>
-              <span className="font-medium">{formData.checkIn}</span>
+              <span className="font-medium text-surface-900">{formData.checkIn}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-surface-600">Check-out:</span>
-              <span className="font-medium">{formData.checkOut}</span>
+              <span className="font-medium text-surface-900">{formData.checkOut}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-surface-600">Guests:</span>
-              <span className="font-medium">{formData.guests}</span>
+              <span className="font-medium text-surface-900">{formData.guests}</span>
             </div>
           </div>
         </div>
 
         <div className="flex gap-4">
-          <button
-            type="submit"
-            className="btn-primary flex-1"
-            disabled={loading}
-          >
-            {loading ? 'Creating Booking...' : 'Confirm Booking'}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="btn-secondary"
-          >
+          <Button type="submit" className="flex-1" disabled={loading}>
+            {loading ? 'Creating booking…' : 'Confirm booking'}
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => router.back()}>
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
     </div>

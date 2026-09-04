@@ -27,8 +27,9 @@ import {
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PhonePeService } from './phonepe.service';
+import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { BookingStatus } from '@hbs/prisma';
+import { BookingStatus, PaymentMethod } from '@hbs/prisma';
 
 @Controller('payments')
 export class PaymentsController {
@@ -44,8 +45,11 @@ export class PaymentsController {
    * Returns a redirect URL to send the guest to PhonePe.
    */
   @Post('initiate')
-  async initiatePayment(@Body() body: { bookingId: string }) {
-    const result = await this.paymentsService.initiatePayment(body.bookingId);
+  async initiatePayment(@Body() body: InitiatePaymentDto) {
+    const result = await this.paymentsService.initiatePayment(
+      body.bookingId,
+      (body.method as PaymentMethod) ?? undefined,
+    );
     return {
       success: true,
       data: result,

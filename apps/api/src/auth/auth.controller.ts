@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
   HttpCode,
@@ -12,7 +13,9 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
@@ -71,5 +74,25 @@ export class AuthController {
         email: req.user.email,
       },
     };
+  }
+
+  /**
+   * Submit (or resubmit) verification info. No automated ID-check API is
+   * wired up — this puts the host in a PENDING queue an admin reviews.
+   */
+  @Post('host/verification')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async submitVerification(
+    @CurrentUser('sub') hostId: string,
+    @Body() dto: SubmitVerificationDto,
+  ) {
+    return { success: true, data: await this.authService.submitVerification(hostId, dto) };
+  }
+
+  @Get('host/verification')
+  @UseGuards(JwtAuthGuard)
+  async getVerification(@CurrentUser('sub') hostId: string) {
+    return { success: true, data: await this.authService.getVerification(hostId) };
   }
 }

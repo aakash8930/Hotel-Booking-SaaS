@@ -67,7 +67,13 @@ export type BookingStatus =
 
 export type PaymentStatus = 'INITIATED' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
 
+export type PaymentMethod = 'UPI' | 'CARD' | 'NETBANKING' | 'WALLET';
+
+export type PayoutStatus = 'PENDING' | 'PAID';
+
 export type PropertyStatus = 'DRAFT' | 'ACTIVE' | 'SUSPENDED';
+
+export type CancellationPolicy = 'FLEXIBLE' | 'MODERATE' | 'STRICT';
 
 export interface Property {
   id: string;
@@ -86,8 +92,12 @@ export interface Property {
   checkInTime: string;
   checkOutTime: string;
   rules: Record<string, unknown> | null;
+  cancellationPolicy: CancellationPolicy;
   createdAt: string;
   updatedAt: string;
+  // Present on property-detail and search responses only.
+  averageRating?: number | null;
+  reviewCount?: number;
 }
 
 export interface Room {
@@ -120,6 +130,26 @@ export interface Booking {
   updatedAt: string;
 }
 
+export interface HostBooking extends Booking {
+  platformFee: number;
+  room: {
+    id: string;
+    name: string;
+    property: { id: string; name: string };
+  };
+  guest: { id: string; name: string; email: string; phone: string | null };
+}
+
+export interface HostAnalytics {
+  totalRevenue: number;
+  totalBookings: number;
+  upcomingCheckIns: number;
+  activeProperties: number;
+  activeRooms: number;
+  averageRating: number | null;
+  reviewCount: number;
+}
+
 export interface Guest {
   id: string;
   email: string;
@@ -133,10 +163,86 @@ export interface Payment {
   amount: number;
   currency: string;
   status: PaymentStatus;
+  method: PaymentMethod;
   provider: string;
   providerTxnId: string | null;
   initiatedAt: string;
   completedAt: string | null;
+  refundedAmount: number | null;
+  refundTxnId: string | null;
+  refundedAt: string | null;
+}
+
+export interface Invoice {
+  id: string;
+  bookingId: string;
+  invoiceNumber: string;
+  hostGstin: string | null;
+  placeOfSupply: string;
+  sacCode: string;
+  taxableAmount: number;
+  gstRate: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalAmount: number;
+  issuedAt: string;
+  booking: {
+    checkIn: string;
+    checkOut: string;
+    guests: number;
+    currency: string;
+    guest: { name: string; email: string };
+    room: {
+      name: string;
+      property: {
+        name: string;
+        address: string;
+        city: string;
+        state: string;
+        pincode: string;
+        host: { name: string; businessName: string | null; gstin: string | null };
+      };
+    };
+  };
+}
+
+export interface Payout {
+  id: string;
+  hostId: string;
+  periodStart: string;
+  periodEnd: string;
+  bookingCount: number;
+  grossAmount: number;
+  platformFee: number;
+  netPayable: number;
+  status: PayoutStatus;
+  payoutReference: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface PayoutBalance {
+  eligibleBookingCount: number;
+  grossAmount: number;
+  platformFee: number;
+  netPayable: number;
+}
+
+export interface Review {
+  id: string;
+  rating: number;
+  comment: string | null;
+  hostReply: string | null;
+  hostRepliedAt: string | null;
+  guestName: string;
+  createdAt: string;
+}
+
+export interface RefundPreview {
+  refundPercent: number;
+  refundAmount: number;
+  hoursBeforeCheckIn: number;
 }
 
 // ── Real-time Events ───────────────────────────────────────────────────────

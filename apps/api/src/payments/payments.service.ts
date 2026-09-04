@@ -26,10 +26,13 @@ import { ConfigService } from '@nestjs/config';
 import { prisma } from '@hbs/prisma';
 import { BookingStatus, PaymentStatus } from '@hbs/prisma';
 import { randomUUID } from 'crypto';
+import type { PaymentMethod } from '@hbs/prisma';
 import { assertCanTransition, canTransition } from '../common/booking-state';
 import { PhonePeService } from './phonepe.service';
 import { EmailService } from './email.service';
+import { WhatsAppService } from './whatsapp.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { InvoicesService } from '../invoices/invoices.service';
 
 @Injectable()
 export class PaymentsService {
@@ -39,7 +42,9 @@ export class PaymentsService {
     private readonly phonepe: PhonePeService,
     private readonly config: ConfigService,
     private readonly email: EmailService,
+    private readonly whatsapp: WhatsAppService,
     private readonly realtime: RealtimeService,
+    private readonly invoices: InvoicesService,
   ) {}
 
   /**
@@ -52,7 +57,7 @@ export class PaymentsService {
    *   4. Call PhonePe to get redirect URL
    *   5. Return redirect URL to frontend
    */
-  async initiatePayment(bookingId: string) {
+  async initiatePayment(bookingId: string, method: PaymentMethod = 'UPI' as PaymentMethod) {
     // ── Fetch booking ──────────────────────────────────────────────────
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -117,6 +122,7 @@ export class PaymentsService {
         amount: booking.totalPrice,
         currency: booking.currency,
         status: PaymentStatus.INITIATED,
+        method,
         provider: 'phonepe',
         providerTxnId: transactionId,
       },
@@ -129,6 +135,7 @@ export class PaymentsService {
       webhookUrl: `${apiUrl}/api/v1/payments/webhook/phonepe`,
       guestName: booking.guest.name,
       guestEmail: booking.guest.email,
+      method,
       ...(booking.guest.phone ? { guestPhone: booking.guest.phone } : {}),
     });
 
@@ -261,7 +268,13 @@ export class PaymentsService {
         `Payment SUCCESS: ${paymentId} | Booking ${bookingId} → PAID`,
       );
 
-      void this.sendConfirmationEmail(bookingId);
+      void this.invoices.generateForBooking(bookingId).catch((error) => {
+        this.logger.error(
+          `Failed to generate invoice for booking ${bookingId}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      });
+      void this.sendConfirmationNotifications(bookingId);
 
       return { processed: true, message: 'Payment successful, booking confirmed' };
     } catch (error) {
@@ -274,18 +287,20 @@ export class PaymentsService {
   }
 
   /**
-   * Fetch booking details and send the confirmation email.
+   * Fetch booking details and send the confirmation email + WhatsApp
+   * message.
    *
    * Called after a payment is confirmed successful. Never throws — a
-   * confirmation email failing to send must not affect the payment/booking
-   * state, which has already been committed by this point.
+   * notification failing to send must not affect the payment/booking
+   * state, which has already been committed by this point. Email and
+   * WhatsApp are independent — one failing doesn't block the other.
    */
-  private async sendConfirmationEmail(bookingId: string): Promise<void> {
+  private async sendConfirmationNotifications(bookingId: string): Promise<void> {
     try {
       const booking = await prisma.booking.findUnique({
         where: { id: bookingId },
         include: {
-          guest: { select: { name: true, email: true } },
+          guest: { select: { name: true, email: true, phone: true } },
           room: {
             select: {
               name: true,
@@ -298,20 +313,35 @@ export class PaymentsService {
 
       if (!booking) return;
 
-      await this.email.sendBookingConfirmation({
-        guestEmail: booking.guest.email,
-        guestName: booking.guest.name,
-        propertyName: booking.room.property.name,
-        roomName: booking.room.name,
-        checkIn: booking.checkIn.toISOString().split('T')[0]!,
-        checkOut: booking.checkOut.toISOString().split('T')[0]!,
-        totalPrice: Number(booking.totalPrice),
-        currency: booking.room.currency,
-        bookingId: booking.id,
-      });
+      const checkIn = booking.checkIn.toISOString().split('T')[0]!;
+      const checkOut = booking.checkOut.toISOString().split('T')[0]!;
+
+      await Promise.allSettled([
+        this.email.sendBookingConfirmation({
+          guestEmail: booking.guest.email,
+          guestName: booking.guest.name,
+          propertyName: booking.room.property.name,
+          roomName: booking.room.name,
+          checkIn,
+          checkOut,
+          totalPrice: Number(booking.totalPrice),
+          currency: booking.room.currency,
+          bookingId: booking.id,
+        }),
+        this.whatsapp.sendBookingConfirmation({
+          guestPhone: booking.guest.phone,
+          guestName: booking.guest.name,
+          propertyName: booking.room.property.name,
+          checkIn,
+          checkOut,
+          totalPrice: Number(booking.totalPrice),
+          currency: booking.room.currency,
+          bookingId: booking.id,
+        }),
+      ]);
     } catch (error) {
       this.logger.error(
-        `Failed to prepare confirmation email for booking ${bookingId}`,
+        `Failed to prepare confirmation notifications for booking ${bookingId}`,
         error instanceof Error ? error.stack : String(error),
       );
     }
@@ -435,6 +465,51 @@ export class PaymentsService {
       status: PaymentStatus.INITIATED,
       bookingStatus: payment.booking.status,
     };
+  }
+
+  /**
+   * Refund the most recent successful payment for a booking.
+   *
+   * Called by BookingsService.cancel() once it's computed a non-zero
+   * refund from the property's cancellation policy. A no-op (returns null)
+   * if there's no successful payment to refund — happens when a PENDING
+   * hold gets cancelled before any payment ever succeeded.
+   */
+  async refundPayment(bookingId: string, refundAmount: number) {
+    const payment = await prisma.payment.findFirst({
+      where: { bookingId, status: PaymentStatus.SUCCESS },
+      orderBy: { completedAt: 'desc' },
+    });
+
+    if (!payment) {
+      return null;
+    }
+
+    const refundTransactionId = `RFD-${Date.now()}-${randomUUID().slice(0, 8)}`;
+    const amountPaise = Math.round(refundAmount * 100);
+
+    const refundResult = await this.phonepe.initiateRefund({
+      originalTransactionId: payment.providerTxnId!,
+      refundTransactionId,
+      amount: amountPaise,
+    });
+
+    const updated = await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: PaymentStatus.REFUNDED,
+        refundedAmount: refundAmount,
+        refundTxnId: refundResult.refundTransactionId,
+        refundedAt: new Date(),
+      },
+    });
+
+    this.logger.log(
+      `Refund ${refundResult.success ? 'confirmed' : 'FAILED'}: ${refundTransactionId} | ` +
+        `booking ${bookingId} | ₹${refundAmount}`,
+    );
+
+    return updated;
   }
 
   /**

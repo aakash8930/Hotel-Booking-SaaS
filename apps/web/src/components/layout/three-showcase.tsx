@@ -37,7 +37,7 @@ export function ThreeShowcase() {
   }, []);
 
   return (
-    <section ref={containerRef} className="section bg-surface-900 overflow-hidden">
+    <section ref={containerRef} className="section bg-surface-50 overflow-hidden border-t border-surface-200">
       <div className="container-custom grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

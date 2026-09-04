@@ -10,7 +10,10 @@ import { prisma } from '@hbs/prisma';
 import { BookingStatus } from '@hbs/prisma';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 import { assertCanTransition } from '../common/booking-state';
+import { calculateRefund } from '../common/cancellation-policy';
 import { RealtimeService } from '../realtime/realtime.service';
+import { PaymentsService } from '../payments/payments.service';
+import { WhatsAppService } from '../payments/whatsapp.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 /** Duration of the soft-hold: 10 minutes to complete payment. */
@@ -20,13 +23,17 @@ const HOLD_DURATION_MS = 10 * 60 * 1000;
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
 
-  constructor(private readonly realtime: RealtimeService) {}
+  constructor(
+    private readonly realtime: RealtimeService,
+    private readonly payments: PaymentsService,
+    private readonly whatsapp: WhatsAppService,
+  ) {}
 
   /**
    * Create a new booking with a soft-hold.
    * The EXCLUDE constraint guarantees no overlapping active bookings.
    */
-  async create(dto: CreateBookingDto) {
+  async create(dto: CreateBookingDto, authenticatedGuestId?: string) {
     const checkIn = new Date(dto.checkIn);
     const checkOut = new Date(dto.checkOut);
 
@@ -60,7 +67,9 @@ export class BookingsService {
     const nights = this.calculateNights(checkIn, checkOut);
     const totalPrice = Number(room.basePrice) * nights;
 
-    const guest = await this.findOrCreateGuest(dto);
+    const guest = authenticatedGuestId
+      ? await prisma.guest.findUniqueOrThrow({ where: { id: authenticatedGuestId } })
+      : await this.findOrCreateGuest(dto);
     const holdExpiresAt = new Date(Date.now() + HOLD_DURATION_MS);
 
     try {
@@ -193,12 +202,40 @@ export class BookingsService {
   }
 
   /**
+   * Preview the refund a cancellation would produce right now, without
+   * actually cancelling — lets the UI show "you'll get ₹X back" before
+   * the guest confirms.
+   */
+  async previewCancellation(bookingId: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { room: { select: { property: { select: { cancellationPolicy: true } } } } },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    return calculateRefund(booking.room.property.cancellationPolicy, booking.checkIn, Number(booking.totalPrice));
+  }
+
+  /**
    * Cancel a booking — uses state machine to validate transition.
    */
   async cancel(bookingId: string, reason?: string) {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { room: { select: { id: true, propertyId: true } } },
+      include: {
+        room: {
+          select: {
+            id: true,
+            propertyId: true,
+            property: { select: { name: true, cancellationPolicy: true } },
+          },
+        },
+        guest: { select: { name: true, phone: true } },
+        payments: { where: { status: 'SUCCESS' }, orderBy: { completedAt: 'desc' }, take: 1 },
+      },
     });
 
     if (!booking) {
@@ -207,6 +244,12 @@ export class BookingsService {
 
     // Validate transition using the state machine
     assertCanTransition(booking.status, BookingStatus.CANCELLED);
+
+    const refund = calculateRefund(
+      booking.room.property.cancellationPolicy,
+      booking.checkIn,
+      Number(booking.totalPrice),
+    );
 
     const updated = await prisma.booking.update({
       where: { id: bookingId },
@@ -218,27 +261,55 @@ export class BookingsService {
       },
     });
 
-    this.logger.log(`Booking cancelled: ${bookingId} (${booking.status} → CANCELLED)`);
+    // Can't fold this into the DB transaction above — it calls out to
+    // PhonePe. The cancellation itself is the authoritative state change;
+    // if the refund call fails, the booking still stays cancelled and this
+    // just gets logged, matching how the webhook handler already treats
+    // external payment calls as separate from booking-state commits.
+    if (refund.refundAmount > 0 && booking.payments[0]) {
+      await this.payments.refundPayment(bookingId, refund.refundAmount);
+    }
+
+    void this.whatsapp.sendCancellationNotice({
+      guestPhone: booking.guest.phone,
+      guestName: booking.guest.name,
+      propertyName: booking.room.property.name,
+      refundAmount: refund.refundAmount,
+      currency: updated.currency,
+    });
+
+    this.logger.log(
+      `Booking cancelled: ${bookingId} (${booking.status} → CANCELLED), ` +
+        `refund: ${refund.refundPercent}% (₹${refund.refundAmount})`,
+    );
 
     void this.realtime.publish('room.released', booking.room.id, booking.room.propertyId, {
       bookingId,
       reason: 'cancelled',
     });
 
-    return updated;
+    return { ...updated, refund };
   }
 
   /**
    * Get all bookings for a host's properties.
    */
-  async findAllForHost(hostId: string) {
+  async findAllForHost(hostId: string, filters?: { status?: BookingStatus; propertyId?: string }) {
     const [host, bookings] = await Promise.all([
       prisma.host.findUnique({
         where: { id: hostId },
         select: { billingPlan: true, commissionRate: true },
       }),
       prisma.booking.findMany({
-        where: { room: { property: { hostId } } },
+        where: {
+          room: {
+            property: {
+              hostId,
+              ...(filters?.propertyId ? { id: filters.propertyId } : {}),
+            },
+          },
+          ...(filters?.status ? { status: filters.status } : {}),
+        },
         include: {
           room: {
             select: {
@@ -252,8 +323,9 @@ export class BookingsService {
       }),
     ]);
 
-    // Platform fee is computed and shown here, not yet collected — see
-    // BillingService for why automated collection is deferred at pilot stage.
+    // Platform fee is computed and shown here per booking; the actual
+    // settlement happens in batches via PayoutsService, which recomputes
+    // this same fee at generation time from the bookings it claims.
     return bookings.map((booking) => ({
       ...booking,
       platformFee:
@@ -261,6 +333,70 @@ export class BookingsService {
           ? Math.round(Number(booking.totalPrice) * (Number(host.commissionRate) / 100) * 100) / 100
           : 0,
     }));
+  }
+
+  /**
+   * Summary stats for the host dashboard.
+   */
+  async getAnalytics(hostId: string) {
+    const revenueStatuses: BookingStatus[] = [
+      BookingStatus.PAID,
+      BookingStatus.CHECKED_IN,
+      BookingStatus.CHECKED_OUT,
+    ];
+    const now = new Date();
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const [revenueBookings, upcomingCheckIns, propertyCount, roomCount, ratingAgg] = await Promise.all([
+      prisma.booking.findMany({
+        where: { room: { property: { hostId } }, status: { in: revenueStatuses } },
+        select: { totalPrice: true },
+      }),
+      prisma.booking.count({
+        where: {
+          room: { property: { hostId } },
+          status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN] },
+          checkIn: { gte: now, lte: weekFromNow },
+        },
+      }),
+      prisma.property.count({ where: { hostId, status: 'ACTIVE' } }),
+      prisma.room.count({ where: { property: { hostId }, isActive: true } }),
+      prisma.review.aggregate({
+        where: { property: { hostId } },
+        _avg: { rating: true },
+        _count: { rating: true },
+      }),
+    ]);
+
+    return {
+      totalRevenue: revenueBookings.reduce((sum, b) => sum + Number(b.totalPrice), 0),
+      totalBookings: revenueBookings.length,
+      upcomingCheckIns,
+      activeProperties: propertyCount,
+      activeRooms: roomCount,
+      averageRating: ratingAgg._avg.rating ? Math.round(ratingAgg._avg.rating * 10) / 10 : null,
+      reviewCount: ratingAgg._count.rating,
+    };
+  }
+
+  /**
+   * Get all bookings made by a logged-in guest ("My trips").
+   */
+  async findAllForGuest(guestId: string) {
+    return prisma.booking.findMany({
+      where: { guestId },
+      include: {
+        room: {
+          select: {
+            id: true,
+            name: true,
+            property: { select: { id: true, name: true, slug: true, city: true, state: true } },
+          },
+        },
+        review: { select: { id: true, rating: true } },
+      },
+      orderBy: { checkIn: 'desc' },
+    });
   }
 
   /**
@@ -370,14 +506,22 @@ export class BookingsService {
   }
 
   /**
-   * Under heavy concurrent contention for the same room/dates, Postgres can
-   * report a genuine deadlock (40P01) while several transactions race to
-   * take locks for the EXCLUDE constraint's overlap check — distinct from an
-   * exclusion violation, which is deterministic and not retryable. A
-   * deadlock just means Postgres broke a lock cycle by aborting one of the
-   * colliding transactions arbitrarily; a short retry resolves it without
-   * changing who ultimately wins the room. Verified under real load in
-   * apps/api/test/concurrency-load.test.ts.
+   * Under heavy concurrent contention for the same room/dates, two distinct
+   * transient failure modes show up, neither of which means the room is
+   * actually unavailable:
+   *   - A genuine Postgres deadlock (40P01) while several transactions race
+   *     to take locks for the EXCLUDE constraint's overlap check.
+   *   - Prisma's connection pool running out under a burst of simultaneous
+   *     requests (P2024, "Timed out fetching a new connection from the
+   *     connection pool") — distinct from a deadlock, but equally resolved
+   *     by backing off and retrying once a connection frees up.
+   * Both are distinct from an exclusion violation, which is deterministic
+   * and not retryable — that's handled separately in handleBookingError.
+   * A 30-way concurrent load test (apps/api/test/concurrency-load.test.ts)
+   * against a single contended room found 3 attempts insufficient — some
+   * requests kept losing the retry race and fell through to a raw,
+   * unhelpful error instead of a clean "try again" response. 6 attempts
+   * with jittered backoff clears it.
    */
   private async createBookingWithDeadlockRetry(
     args: Parameters<typeof prisma.booking.create>[0],
@@ -386,11 +530,16 @@ export class BookingsService {
     try {
       return await prisma.booking.create(args);
     } catch (error: unknown) {
+      const prismaCode = (error as { code?: string }).code;
       const message = (error as { message?: string }).message ?? '';
-      const isDeadlock = message.includes('40P01') || message.includes('deadlock detected');
+      const isRetryable =
+        prismaCode === 'P2024' ||
+        message.includes('40P01') ||
+        message.includes('deadlock detected') ||
+        message.includes('Timed out fetching a new connection');
 
-      if (isDeadlock && attempt < 3) {
-        await new Promise((resolve) => setTimeout(resolve, 20 + Math.random() * 60));
+      if (isRetryable && attempt < 6) {
+        await new Promise((resolve) => setTimeout(resolve, 20 + Math.random() * 80));
         return this.createBookingWithDeadlockRetry(args, attempt + 1);
       }
 

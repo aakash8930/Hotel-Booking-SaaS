@@ -1,14 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useAvailability } from '@/lib/use-availability';
 import { FaqChat } from '@/components/property/faq-chat';
+import { ReviewsSection } from '@/components/property/reviews-section';
+import { StarRating } from '@/components/property/star-rating';
+import { PropertyMap } from '@/components/property/property-map';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { CANCELLATION_POLICY_LABELS, CANCELLATION_POLICY_DESCRIPTIONS } from '@/lib/cancellation-policy';
 import type { Property, Room } from '@hbs/shared';
 
-type PropertyWithRooms = Property & { rooms: Room[] };
+type PropertyWithRooms = Property & {
+  rooms: Room[];
+  host: { id: string; name: string; businessName: string | null; verificationStatus: string };
+};
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -65,9 +74,7 @@ export default function PropertyDetailPage() {
           <p className="text-surface-500 mb-6">
             This listing may have been removed or the link is incorrect.
           </p>
-          <button onClick={() => router.push('/')} className="btn-primary">
-            Back to home
-          </button>
+          <Button onClick={() => router.push('/')}>Back to home</Button>
         </div>
       </div>
     );
@@ -83,7 +90,7 @@ export default function PropertyDetailPage() {
 
         <button
           onClick={() => router.back()}
-          className="absolute top-6 left-6 z-10 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 backdrop-blur text-sm font-medium text-surface-800 hover:bg-white transition-colors"
+          className="absolute top-24 left-6 z-10 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-surface-100/80 backdrop-blur border border-surface-300/40 text-sm font-medium text-surface-800 hover:bg-surface-200/80 transition-colors"
         >
           ← Back to search
         </button>
@@ -97,9 +104,22 @@ export default function PropertyDetailPage() {
           <p className="text-brand-100 text-sm tracking-[0.15em] uppercase mb-2">
             {property.city}, {property.state}
           </p>
-          <h1 className="font-display text-4xl md:text-6xl font-bold text-white text-balance">
-            {property.name}
-          </h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="font-display text-4xl md:text-6xl font-bold text-white text-balance">
+              {property.name}
+            </h1>
+            {property.averageRating && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-950/20 backdrop-blur border border-white/20 text-sm text-white">
+                <StarRating rating={property.averageRating} size="sm" />
+                {property.averageRating} ({property.reviewCount})
+              </span>
+            )}
+            {property.host.verificationStatus === 'VERIFIED' && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur border border-emerald-400/40 text-sm text-emerald-100">
+                ✓ Verified host
+              </span>
+            )}
+          </div>
         </motion.div>
       </div>
 
@@ -152,9 +172,8 @@ export default function PropertyDetailPage() {
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.9 }}
-                                className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700"
                               >
-                                Just booked
+                                <Badge tone="warning">Just booked</Badge>
                               </motion.span>
                             )}
                           </AnimatePresence>
@@ -178,24 +197,26 @@ export default function PropertyDetailPage() {
                       </div>
                       <div className="text-right sm:ml-6 flex sm:flex-col justify-between sm:justify-start items-end sm:items-end">
                         <div>
-                          <p className="text-3xl font-bold text-brand-600">
+                          <p className="text-3xl font-bold text-brand-400">
                             ₹{room.basePrice.toLocaleString('en-IN')}
                           </p>
                           <p className="text-surface-500 text-sm mb-3">per night</p>
                         </div>
-                        <button
-                          onClick={() => handleBookRoom(room)}
-                          disabled={justHeld}
-                          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
+                        <Button onClick={() => handleBookRoom(room)} disabled={justHeld}>
                           {justHeld ? 'Unavailable' : 'Book now'}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </motion.div>
                 );
               })}
             </motion.div>
+
+            <div className="mt-16">
+              <Suspense fallback={null}>
+                <ReviewsSection propertyId={property.id} />
+              </Suspense>
+            </div>
           </div>
 
           {/* Sticky summary sidebar */}
@@ -218,6 +239,17 @@ export default function PropertyDetailPage() {
                   </div>
                 </dl>
               </div>
+
+              <div className="card p-6">
+                <h3 className="font-semibold text-surface-900 mb-2">
+                  Cancellation policy · {CANCELLATION_POLICY_LABELS[property.cancellationPolicy]}
+                </h3>
+                <p className="text-surface-500 text-sm">
+                  {CANCELLATION_POLICY_DESCRIPTIONS[property.cancellationPolicy]}
+                </p>
+              </div>
+
+              <PropertyMap latitude={property.latitude} longitude={property.longitude} />
 
               <FaqChat propertyId={property.id} />
             </div>

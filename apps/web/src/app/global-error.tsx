@@ -14,11 +14,23 @@ export default function GlobalError({
 
   return (
     <html>
-      <body>
-        <div className="min-h-screen flex items-center justify-center px-4 text-center">
+      <body style={{ background: '#0a0a0f', color: '#f7f7fa', margin: 0 }}>
+        <div
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 1rem',
+            textAlign: 'center',
+            fontFamily: 'system-ui, sans-serif',
+          }}
+        >
           <div>
-            <h1 className="text-2xl font-bold mb-2">Something went wrong</h1>
-            <p className="text-surface-500">
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+              Something went wrong
+            </h1>
+            <p style={{ color: '#9d9dac' }}>
               We&apos;ve been notified and are looking into it. Please try again.
             </p>
           </div>

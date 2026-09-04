@@ -65,7 +65,7 @@ const itemVariants = {
 
 export function Features() {
   return (
-    <section className="section bg-white">
+    <section className="section bg-surface-50">
       <div className="container-custom">
         <div className="text-center mb-16">
           <h2 className="font-display text-4xl md:text-5xl font-bold text-surface-900 mb-4">
@@ -86,10 +86,10 @@ export function Features() {
           {features.map((feature) => (
             <motion.div
               key={feature.title}
-              className="card p-8"
+              className="card p-8 hover:shadow-glow"
               variants={itemVariants}
             >
-              <div className="text-4xl mb-4">{feature.icon}</div>
+              <div className="text-4xl mb-4 w-14 h-14 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">{feature.icon}</div>
               <h3 className="text-xl font-semibold text-surface-900 mb-2">
                 {feature.title}
               </h3>

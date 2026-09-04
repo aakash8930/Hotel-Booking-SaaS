@@ -114,7 +114,7 @@ export function JourneyStory() {
 
   return (
     <section ref={sectionRef} className="relative" style={{ height: '300vh' }}>
-      <div className="journey-viewport relative h-screen w-full overflow-hidden bg-surface-900">
+      <div className="journey-viewport relative h-screen w-full overflow-hidden bg-surface-50">
         {scenes.map((scene, i) => (
           <div
             key={scene.key}

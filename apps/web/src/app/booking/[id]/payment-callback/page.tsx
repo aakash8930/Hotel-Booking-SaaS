@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 
 interface VerifyResponse {
   paymentId: string;
@@ -67,41 +68,35 @@ function PaymentCallback() {
 
         {status === 'success' && (
           <>
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-500/15 border border-emerald-500/30 rounded-full mb-4">
+              <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
             <h1 className="text-2xl font-bold text-surface-900 mb-2">Payment successful</h1>
             <p className="text-surface-500 mb-6">Your booking is confirmed and paid.</p>
-            <button
-              onClick={() => router.push(`/booking/${bookingId}/confirm`)}
-              className="btn-primary"
-            >
+            <Button onClick={() => router.push(`/booking/${bookingId}/confirm`)}>
               View booking
-            </button>
+            </Button>
           </>
         )}
 
         {(status === 'failed' || status === 'error') && (
           <>
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
-              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-red-500/15 border border-red-500/30 rounded-full mb-4">
+              <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
             <h1 className="text-2xl font-bold text-surface-900 mb-2">Payment not completed</h1>
             <p className="text-surface-500 mb-6">{message || 'Something went wrong.'}</p>
             <div className="flex gap-4 justify-center">
-              <button
-                onClick={() => router.push(`/booking/${bookingId}/confirm`)}
-                className="btn-primary"
-              >
+              <Button onClick={() => router.push(`/booking/${bookingId}/confirm`)}>
                 Try again
-              </button>
-              <button onClick={() => router.push('/')} className="btn-secondary">
+              </Button>
+              <Button variant="secondary" onClick={() => router.push('/')}>
                 Back to home
-              </button>
+              </Button>
             </div>
           </>
         )}

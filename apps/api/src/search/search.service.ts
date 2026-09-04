@@ -40,7 +40,10 @@ export class SearchService {
       where.state = { contains: dto.state, mode: 'insensitive' };
     }
 
-    // Fetch properties with rooms
+    // Fetch properties with rooms — filtering (rating, availability) and
+    // sorting happen in-memory below, so pagination applies after that,
+    // not at the DB query level. Fine at this data scale (pilot stage);
+    // would need to move to a DB-level query if the catalog grows large.
     const properties = await prisma.property.findMany({
       where,
       include: {
@@ -49,13 +52,29 @@ export class SearchService {
           orderBy: { basePrice: 'asc' },
         },
         host: {
-          select: { name: true, businessName: true },
+          select: { name: true, businessName: true, verificationStatus: true },
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: dto.limit ?? 20,
-      skip: dto.offset ?? 0,
     });
+
+    const ratings = await prisma.review.groupBy({
+      by: ['propertyId'],
+      where: { propertyId: { in: properties.map((p) => p.id) }, hiddenAt: null },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+    const ratingByProperty = new Map(
+      ratings.map((r) => [
+        r.propertyId,
+        {
+          averageRating: r._avg.rating ? Math.round(r._avg.rating * 10) / 10 : null,
+          reviewCount: r._count.rating,
+        },
+      ]),
+    );
+
+    const requestedAmenities = dto.amenities?.map((a) => a.toLowerCase()) ?? [];
 
     // For each room, check availability for the requested dates
     const results = await Promise.all(
@@ -74,6 +93,13 @@ export class SearchService {
 
             if (dto.minPrice && Number(room.basePrice) < dto.minPrice) {
               return null;
+            }
+
+            // Every requested amenity must be present on the room
+            if (requestedAmenities.length > 0) {
+              const roomAmenities = room.amenities.map((a) => a.toLowerCase());
+              const hasAll = requestedAmenities.every((a) => roomAmenities.includes(a));
+              if (!hasAll) return null;
             }
 
             // Check availability: no overlapping active bookings
@@ -108,6 +134,12 @@ export class SearchService {
           return null; // No available rooms in this property
         }
 
+        const rating = ratingByProperty.get(property.id) ?? { averageRating: null, reviewCount: 0 };
+
+        if (dto.minRating && (rating.averageRating ?? 0) < dto.minRating) {
+          return null;
+        }
+
         return {
           id: property.id,
           name: property.name,
@@ -122,19 +154,29 @@ export class SearchService {
           host: property.host,
           rooms,
           lowestPrice: Math.min(...rooms.map((r: any) => r.basePrice)),
+          averageRating: rating.averageRating,
+          reviewCount: rating.reviewCount,
+          createdAt: property.createdAt,
         };
       }),
     );
 
-    const availableProperties = results.filter(Boolean);
+    let availableProperties = results.filter((p): p is NonNullable<typeof p> => p !== null);
+
+    availableProperties = this.sortResults(availableProperties, dto.sortBy);
+
+    const total = availableProperties.length;
+    const offset = dto.offset ?? 0;
+    const limit = dto.limit ?? 20;
+    const page = availableProperties.slice(offset, offset + limit);
 
     this.logger.log(
       `Search: city=${dto.city ?? '*'}, dates=${dto.checkIn}→${dto.checkOut}, ` +
-        `results=${availableProperties.length}`,
+        `results=${total}`,
     );
 
     return {
-      properties: availableProperties,
+      properties: page,
       search: {
         checkIn: dto.checkIn,
         checkOut: dto.checkOut,
@@ -143,8 +185,26 @@ export class SearchService {
         state: dto.state ?? null,
         nights: this.calculateNights(checkIn, checkOut),
       },
-      total: availableProperties.length,
+      total,
     };
+  }
+
+  private sortResults<
+    T extends { lowestPrice: number; averageRating: number | null; createdAt: Date },
+  >(results: T[], sortBy?: string): T[] {
+    const sorted = [...results];
+    switch (sortBy) {
+      case 'price_asc':
+        return sorted.sort((a, b) => a.lowestPrice - b.lowestPrice);
+      case 'price_desc':
+        return sorted.sort((a, b) => b.lowestPrice - a.lowestPrice);
+      case 'rating_desc':
+        return sorted.sort((a, b) => (b.averageRating ?? 0) - (a.averageRating ?? 0));
+      case 'newest':
+        return sorted.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      default:
+        return sorted;
+    }
   }
 
   private calculateNights(checkIn: Date, checkOut: Date): number {

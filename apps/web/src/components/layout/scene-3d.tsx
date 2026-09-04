@@ -28,7 +28,7 @@ function KeyShape() {
       <mesh ref={meshRef}>
         <icosahedronGeometry args={[1.4, 4]} />
         <MeshDistortMaterial
-          color="#c96820"
+          color="#d4841e"
           distort={0.35}
           speed={1.6}
           roughness={0.2}

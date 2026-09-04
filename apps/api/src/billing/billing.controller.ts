@@ -1,6 +1,7 @@
 import { Controller, Get, Put, Body, UseGuards } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { UpdateBillingPlanDto } from './dto/update-billing-plan.dto';
+import { UpdateGstinDto } from './dto/update-gstin.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -22,5 +23,11 @@ export class BillingController {
   ) {
     const plan = await this.billing.setPlan(hostId, dto.billingPlan);
     return { success: true, data: plan };
+  }
+
+  @Put('gstin')
+  async setGstin(@CurrentUser('sub') hostId: string, @Body() dto: UpdateGstinDto) {
+    const result = await this.billing.setGstin(hostId, dto.gstin ?? null);
+    return { success: true, data: result };
   }
 }

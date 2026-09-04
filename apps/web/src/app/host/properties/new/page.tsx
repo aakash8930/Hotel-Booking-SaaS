@@ -3,8 +3,23 @@
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import {
+  CANCELLATION_POLICY_LABELS,
+  CANCELLATION_POLICY_DESCRIPTIONS,
+} from '@/lib/cancellation-policy';
+import { RequireHost } from '@/components/host/require-host';
+import type { CancellationPolicy } from '@hbs/shared';
 
 export default function NewPropertyPage() {
+  return (
+    <RequireHost>
+      <NewPropertyForm />
+    </RequireHost>
+  );
+}
+
+function NewPropertyForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -18,6 +33,7 @@ export default function NewPropertyPage() {
     checkInTime: '14:00',
     checkOutTime: '11:00',
     status: 'ACTIVE',
+    cancellationPolicy: 'MODERATE' as CancellationPolicy,
   });
 
   const [notes, setNotes] = useState('');
@@ -60,16 +76,16 @@ export default function NewPropertyPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Add New Property</h1>
+    <div className="container-custom pt-28 pb-16 md:pt-32 max-w-2xl">
+      <h1 className="font-display text-3xl md:text-4xl font-bold mb-8 text-surface-900">Add new property</h1>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl mb-6">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="card p-6 md:p-8 space-y-6">
         <div>
           <label className="block text-sm font-medium mb-2">Property Name</label>
           <input
@@ -81,9 +97,9 @@ export default function NewPropertyPage() {
           />
         </div>
 
-        <div className="bg-surface-50 border border-surface-200 rounded-lg p-4">
-          <label className="block text-sm font-medium mb-2">
-            Rough notes <span className="text-surface-400 font-normal">(optional)</span>
+        <div className="bg-brand-500/5 border border-brand-500/20 rounded-xl p-4">
+          <label className="block text-sm font-medium mb-2 text-surface-800">
+            Rough notes <span className="text-surface-500 font-normal">(optional)</span>
           </label>
           <p className="text-xs text-surface-500 mb-2">
             Jot down a few bullet points — views, vibe, what makes the place special — and
@@ -95,15 +111,16 @@ export default function NewPropertyPage() {
             onChange={(e) => setNotes(e.target.value)}
             placeholder="mountain views, home-cooked breakfast, quiet, family-run, 10 min from the temple..."
           />
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={handleGenerateDescription}
             disabled={!notes.trim() || generating}
-            className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {generating ? 'Generating...' : 'Generate description with AI'}
-          </button>
-          {aiError && <p className="text-sm text-red-600 mt-2">{aiError}</p>}
+            ✨ {generating ? 'Generating…' : 'Generate description with AI'}
+          </Button>
+          {aiError && <p className="text-sm text-red-400 mt-2">{aiError}</p>}
         </div>
 
         <div>
@@ -190,17 +207,45 @@ export default function NewPropertyPage() {
           </div>
         </div>
 
+        <div>
+          <label className="block text-sm font-medium mb-2">Cancellation policy</label>
+          <div className="grid gap-3">
+            {(Object.keys(CANCELLATION_POLICY_LABELS) as CancellationPolicy[]).map((policy) => (
+              <label
+                key={policy}
+                className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+                  form.cancellationPolicy === policy
+                    ? 'border-brand-500 ring-2 ring-brand-500/30 bg-brand-500/5'
+                    : 'border-surface-300 hover:border-surface-400'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="cancellationPolicy"
+                  className="mt-1 accent-brand-500"
+                  checked={form.cancellationPolicy === policy}
+                  onChange={() => setForm({ ...form, cancellationPolicy: policy })}
+                />
+                <div>
+                  <p className="font-medium text-surface-900 text-sm">
+                    {CANCELLATION_POLICY_LABELS[policy]}
+                  </p>
+                  <p className="text-surface-500 text-xs mt-0.5">
+                    {CANCELLATION_POLICY_DESCRIPTIONS[policy]}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
         <div className="flex gap-4 pt-4">
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Creating...' : 'Create Property'}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="btn-secondary"
-          >
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Creating…' : 'Create property'}
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => router.back()}>
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
     </div>

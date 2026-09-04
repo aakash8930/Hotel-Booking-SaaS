@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { SmoothScroll } from '@/components/animations/smooth-scroll';
+import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 
 const inter = Inter({
@@ -45,15 +46,20 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport = {
+  themeColor: '#0a0a0f',
+};
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+    <html lang="en" className={`${inter.variable} ${playfair.variable} dark`}>
       <body className="font-sans flex flex-col min-h-screen">
         <SmoothScroll>
+          <Header />
           <div className="flex-1">{children}</div>
           <Footer />
         </SmoothScroll>

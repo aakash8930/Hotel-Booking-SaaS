@@ -63,7 +63,7 @@ export function FaqChat({ propertyId }: { propertyId: string }) {
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+      {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
 
       <form onSubmit={handleAsk} className="flex gap-2">
         <input

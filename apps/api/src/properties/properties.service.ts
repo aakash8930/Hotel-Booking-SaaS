@@ -33,6 +33,7 @@ export class PropertiesService {
         checkInTime: dto.checkInTime ?? '14:00',
         checkOutTime: dto.checkOutTime ?? '11:00',
         rules: dto.rules ? JSON.stringify(dto.rules) : null,
+        cancellationPolicy: dto.cancellationPolicy ?? 'MODERATE',
       },
     });
 
@@ -97,6 +98,7 @@ export class PropertiesService {
             id: true,
             name: true,
             businessName: true,
+            verificationStatus: true,
           },
         },
         rooms: {
@@ -110,7 +112,17 @@ export class PropertiesService {
       throw new NotFoundException('Property not found');
     }
 
-    return property;
+    const ratingAgg = await prisma.review.aggregate({
+      where: { propertyId: property.id, hiddenAt: null },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    return {
+      ...property,
+      averageRating: ratingAgg._avg.rating ? Math.round(ratingAgg._avg.rating * 10) / 10 : null,
+      reviewCount: ratingAgg._count.rating,
+    };
   }
 
   /**
@@ -135,6 +147,7 @@ export class PropertiesService {
     if (dto.checkInTime !== undefined) updateData.checkInTime = dto.checkInTime;
     if (dto.checkOutTime !== undefined) updateData.checkOutTime = dto.checkOutTime;
     if (dto.rules !== undefined) updateData.rules = dto.rules ? JSON.stringify(dto.rules) : null;
+    if (dto.cancellationPolicy !== undefined) updateData.cancellationPolicy = dto.cancellationPolicy;
 
     const property = await prisma.property.update({
       where: { id: propertyId },

@@ -10,6 +10,7 @@ import * as bcrypt from 'bcryptjs';
 import { prisma } from '@hbs/prisma';
 import type { RegisterDto } from './dto/register.dto';
 import type { LoginDto } from './dto/login.dto';
+import type { SubmitVerificationDto } from './dto/submit-verification.dto';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -17,6 +18,7 @@ interface TokenPayload {
   sub: string; // host id
   email: string;
   type: 'access' | 'refresh';
+  role: 'host';
 }
 
 interface AuthResponse {
@@ -151,6 +153,36 @@ export class AuthService {
   }
 
   /**
+   * Submit host verification info for admin review. No automated ID-check
+   * API is wired up (real ones need a paid, KYC-registered provider) — this
+   * queues a PENDING record for a human admin to approve/reject. The raw ID
+   * number is never stored, only a masked form, matching how Payment.upiId
+   * is already handled elsewhere in this codebase.
+   */
+  async submitVerification(hostId: string, dto: SubmitVerificationDto) {
+    const masked = dto.idNumber.length > 4
+      ? `${'X'.repeat(dto.idNumber.length - 4)}${dto.idNumber.slice(-4)}`
+      : dto.idNumber;
+
+    return prisma.host.update({
+      where: { id: hostId },
+      data: {
+        verificationStatus: 'PENDING',
+        verificationNote: `${dto.idType}: ${masked}`,
+        verifiedAt: null,
+      },
+      select: { verificationStatus: true, verificationNote: true, verifiedAt: true },
+    });
+  }
+
+  async getVerification(hostId: string) {
+    return prisma.host.findUniqueOrThrow({
+      where: { id: hostId },
+      select: { verificationStatus: true, verificationNote: true, verifiedAt: true },
+    });
+  }
+
+  /**
    * Logout — revoke all refresh tokens for a host.
    */
   async logout(hostId: string): Promise<void> {
@@ -171,6 +203,7 @@ export class AuthService {
       sub: hostId,
       email,
       type: 'access',
+      role: 'host',
     };
 
     const accessToken = this.jwtService.sign(payload);

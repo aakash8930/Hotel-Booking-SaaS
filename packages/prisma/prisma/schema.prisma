@@ -37,6 +37,18 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PaymentMethod {
+  UPI
+  CARD
+  NETBANKING
+  WALLET
+}
+
+enum PayoutStatus {
+  PENDING
+  PAID
+}
+
 enum PropertyStatus {
   DRAFT
   ACTIVE
@@ -46,6 +58,26 @@ enum PropertyStatus {
 enum BillingPlan {
   COMMISSION   // Platform takes a % of each booking's total
   SUBSCRIPTION // Host pays a flat recurring fee, 0% commission
+}
+
+// FLEXIBLE:  full refund if cancelled >= 24h before check-in
+// MODERATE:  full refund >= 5 days before check-in, 50% refund before that
+// STRICT:    50% refund >= 7 days before check-in, no refund after
+enum CancellationPolicy {
+  FLEXIBLE
+  MODERATE
+  STRICT
+}
+
+// Host identity verification — scoped to hosts, not guests: hosts carry the
+// real financial/property stake (payouts, listings), so they're where a
+// trust signal actually matters, the same reasoning Airbnb-style platforms
+// use for host-only verification badges.
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
 }
 
 // ── Hosts (property owners) ─────────────────────────────────────────────────
@@ -62,6 +94,16 @@ model Host {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  // ── Verification ────────────────────────────────────────────────────
+  // No real ID-verification API is wired up (Aadhaar/PAN verification
+  // needs a paid, KYC-registered provider) — this is a manual submit →
+  // admin-review workflow instead, which is still a real trust signal
+  // (a "Verified host" badge backed by an actual review), just not an
+  // automated one.
+  verificationStatus VerificationStatus @default(UNVERIFIED) @map("verification_status")
+  verificationNote   String?            @map("verification_note")
+  verifiedAt         DateTime?          @map("verified_at")
+
   // ── Billing plan ──────────────────────────────────────────────────────
   // Host-selectable: pay per booking (commission) or a flat recurring fee
   // (subscription). Rates are configurable per host so early hosts can be
@@ -74,8 +116,15 @@ model Host {
   subscriptionFee  Decimal     @default(999.00) @db.Decimal(10, 2) @map("subscription_fee")
   billingPlanSetAt DateTime?   @map("billing_plan_set_at")
 
+  // GST registration is threshold-based, not mandatory for every small
+  // host — nullable. Without it, invoices are issued as "unregistered
+  // supplier" (no GSTIN line, no input-tax-credit claim possible for the
+  // guest) rather than blocked entirely.
+  gstin String? @map("gstin")
+
   properties Property[]
   refreshToken RefreshToken[]
+  payouts      Payout[]
 
   @@map("hosts")
 }
@@ -99,11 +148,13 @@ model Property {
   checkInTime  String?       @default("14:00") @map("check_in_time")
   checkOutTime String?       @default("11:00") @map("check_out_time")
   rules        String?       // JSON blob: house rules, policies
+  cancellationPolicy CancellationPolicy @default(MODERATE) @map("cancellation_policy")
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
-  host  Host   @relation(fields: [hostId], references: [id])
-  rooms Room[]
+  host    Host     @relation(fields: [hostId], references: [id])
+  rooms   Room[]
+  reviews Review[]
 
   @@index([hostId])
   @@index([city, state])
@@ -141,12 +192,64 @@ model Guest {
   email     String   @unique
   name      String
   phone     String?
+  // Nullable: guests created via guest-checkout (no account) have none.
+  // Registering with the same email later "claims" that history by
+  // setting this field on the existing row instead of creating a duplicate.
+  passwordHash String? @map("password_hash")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  bookings Booking[]
+  bookings      Booking[]
+  reviews       Review[]
+  refreshTokens GuestRefreshToken[]
 
   @@map("guests")
+}
+
+model GuestRefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  guest     Guest     @relation(fields: [guestId], references: [id])
+  guestId   String    @map("guest_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([guestId])
+  @@map("guest_refresh_tokens")
+}
+
+// ── Admins (platform operators) ──────────────────────────────────────────────
+// Deliberately no public registration endpoint — unlike Host/Guest, an
+// Admin account is created via scripts/create-admin.ts (run by whoever
+// controls the deploy environment), never through the API. Replaces the
+// shared-secret AdminKeyGuard from the payouts work: a named, logged-in
+// admin action beats an anonymous header key for anything sensitive.
+
+model Admin {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  refreshTokens AdminRefreshToken[]
+
+  @@map("admins")
+}
+
+model AdminRefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  admin     Admin     @relation(fields: [adminId], references: [id])
+  adminId   String    @map("admin_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([adminId])
+  @@map("admin_refresh_tokens")
 }
 
 // ── Bookings (the critical table) ───────────────────────────────────────────
@@ -182,11 +285,54 @@ model Booking {
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
   payments Payment[]
+  review   Review?
+  invoice  Invoice?
+
+  // Set once this booking's payout to the host has been included in a
+  // settlement batch — prevents double-paying the host for the same
+  // booking across multiple payout runs.
+  payout   Payout? @relation(fields: [payoutId], references: [id])
+  payoutId String? @map("payout_id") @db.Uuid
 
   @@index([roomId, status])
   @@index([guestId])
   @@index([holdExpiresAt])
+  @@index([payoutId])
   @@map("bookings")
+}
+
+// ── Reviews ─────────────────────────────────────────────────────────────────
+// One review per booking (enforced by the unique bookingId below). Creation
+// is gated in ReviewsService on the booking having actually completed a
+// stay — not enforced at the DB level since "completed" depends on status
+// plus checkout date, not a single column.
+
+model Review {
+  id         String   @id @default(uuid()) @db.Uuid
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  bookingId  String   @unique @map("booking_id") @db.Uuid
+  property   Property @relation(fields: [propertyId], references: [id])
+  propertyId String   @map("property_id") @db.Uuid
+  guest      Guest    @relation(fields: [guestId], references: [id])
+  guestId    String   @map("guest_id") @db.Uuid
+  rating     Int      @db.SmallInt
+  comment    String?
+  hostReply  String?  @map("host_reply")
+  hostRepliedAt DateTime? @map("host_replied_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // ── Moderation ──────────────────────────────────────────────────────
+  // Guests can report a review; enough reports auto-hide it pending admin
+  // review (see ReviewsService.REPORT_AUTO_HIDE_THRESHOLD). An admin can
+  // also hide/unhide directly. Hidden reviews are excluded from the public
+  // property listing but stay visible to admins.
+  reportCount  Int       @default(0) @map("report_count")
+  hiddenAt     DateTime? @map("hidden_at")
+  hiddenReason String?   @map("hidden_reason")
+
+  @@index([propertyId])
+  @@map("reviews")
 }
 
 // ── Payments ────────────────────────────────────────────────────────────────
@@ -198,6 +344,7 @@ model Payment {
   amount           Decimal       @db.Decimal(10, 2)
   currency         String        @default("INR")
   status           PaymentStatus @default(INITIATED)
+  method           PaymentMethod @default(UPI)
   provider         String        @default("phonepe")
   providerTxnId    String?       @unique @map("provider_txn_id")
   providerResponse Json?         @map("provider_response")
@@ -205,9 +352,92 @@ model Payment {
   initiatedAt      DateTime      @default(now()) @map("initiated_at")
   completedAt      DateTime?     @map("completed_at")
 
+  // Refund tracking — set when a cancellation produces a non-zero refund.
+  // See PhonePeService.initiateRefund: sandboxed the same way payment
+  // initiation is, since this project has no live gateway credentials.
+  refundedAmount Decimal?  @db.Decimal(10, 2) @map("refunded_amount")
+  refundTxnId    String?   @map("refund_txn_id")
+  refundedAt     DateTime? @map("refunded_at")
+
   @@index([bookingId])
   @@index([providerTxnId])
   @@map("payments")
+}
+
+// ── Invoices (GST tax invoice per paid booking) ──────────────────────────────
+//
+// Simplified but real GST logic for hotel accommodation, not a full tax
+// engine — documented in InvoicesService:
+//   - SAC 996311 (hotel/accommodation services) on every invoice.
+//   - Rate by per-night tariff slab (≤ ₹7,500/night = 12%, above = 18%),
+//     the current slab structure at time of writing — GST rates on
+//     accommodation have changed before and may again.
+//   - CGST+SGST split when host and property share a state (the normal
+//     case), IGST when they don't. Place of supply for accommodation is
+//     always the property's own state (Section 12(3), IGST Act) — the
+//     comparison is against the host's registered GSTIN state code, not
+//     the guest's location.
+//   - No GSTIN on file → issued as an unregistered-supplier invoice
+//     (still legally issuable; the guest just can't claim input credit).
+// Invoice numbers are sequential per calendar year via InvoiceSequence,
+// incremented atomically (single-row UPDATE is atomic in Postgres even
+// outside a serializable transaction).
+
+model Invoice {
+  id             String   @id @default(uuid()) @db.Uuid
+  booking        Booking  @relation(fields: [bookingId], references: [id])
+  bookingId      String   @unique @map("booking_id") @db.Uuid
+  invoiceNumber  String   @unique @map("invoice_number")
+  hostGstin      String?  @map("host_gstin")
+  placeOfSupply  String   @map("place_of_supply") // property's state
+  sacCode        String   @default("996311") @map("sac_code")
+  taxableAmount  Decimal  @db.Decimal(10, 2) @map("taxable_amount")
+  gstRate        Decimal  @db.Decimal(4, 2) @map("gst_rate") // e.g. 12.00 or 18.00
+  cgstAmount     Decimal  @db.Decimal(10, 2) @map("cgst_amount")
+  sgstAmount     Decimal  @db.Decimal(10, 2) @map("sgst_amount")
+  igstAmount     Decimal  @db.Decimal(10, 2) @map("igst_amount")
+  totalAmount    Decimal  @db.Decimal(10, 2) @map("total_amount")
+  issuedAt       DateTime @default(now()) @map("issued_at")
+
+  @@map("invoices")
+}
+
+model InvoiceSequence {
+  year  Int @id
+  value Int @default(0)
+
+  @@map("invoice_sequences")
+}
+
+// ── Payouts (host settlement ledger) ─────────────────────────────────────────
+//
+// Guest payments all land in one central platform PhonePe account — there's
+// no per-host merchant account, so hosts are owed money the platform is
+// holding. This is the ledger that tracks what's owed and what's been
+// settled. It does NOT move money itself: PAID just records that a bank
+// transfer happened outside the system (matches how BillingService already
+// describes pilot-stage settlement — "directly with the StayEase team" —
+// now with an auditable record instead of nothing).
+
+model Payout {
+  id               String       @id @default(uuid()) @db.Uuid
+  host             Host         @relation(fields: [hostId], references: [id])
+  hostId           String       @map("host_id") @db.Uuid
+  periodStart      DateTime     @map("period_start")
+  periodEnd        DateTime     @map("period_end")
+  bookingCount     Int          @map("booking_count")
+  grossAmount      Decimal      @db.Decimal(12, 2) @map("gross_amount")
+  platformFee      Decimal      @db.Decimal(12, 2) @map("platform_fee")
+  netPayable       Decimal      @db.Decimal(12, 2) @map("net_payable")
+  status           PayoutStatus @default(PENDING)
+  payoutReference  String?      @map("payout_reference") // bank transfer ref, filled in when marked paid
+  paidAt           DateTime?    @map("paid_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  bookings Booking[]
+
+  @@index([hostId])
+  @@map("payouts")
 }
 
 // ── Refresh Tokens (JWT rotation) ───────────────────────────────────────────

@@ -10,14 +10,14 @@ export function LegalPage({
   children: React.ReactNode;
 }) {
   return (
-    <div className="container-custom max-w-3xl py-16">
+    <div className="container-custom max-w-3xl pt-28 pb-16 md:pt-32">
       <div className="mb-10">
         <h1 className="font-display text-4xl font-bold text-surface-900 mb-2">{title}</h1>
         <p className="text-sm text-surface-500">Last updated: {lastUpdated}</p>
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-10 text-sm text-amber-800">
-        <strong>Template notice:</strong> This is a starting-point document adapted to how
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-10 text-sm text-amber-300">
+        <strong className="text-amber-200">Template notice:</strong> This is a starting-point document adapted to how
         StayEase actually works, not a substitute for legal advice. Have it reviewed by a
         qualified lawyer before relying on it for real bookings and real money.
       </div>
