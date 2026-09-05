@@ -22,6 +22,7 @@ Existing refresh tokens created by older builds used salted bcrypt hashes and ca
 - Verify the exact PhonePe signing scheme against current provider documentation before production credentials are enabled.
 - Add currency reconciliation and reject missing provider amount fields if the live provider contract guarantees them.
 - Add refund retry/reconciliation state instead of treating a provider call as immediately settled.
+- Generic host booking transition now blocks direct CANCELLED/REFUNDED transitions so financial state changes cannot bypass dedicated workflows.
 - Verify admin authorization on every sensitive admin route.
 - Add secure cookie/session strategy if tokens are moved out of browser storage.
 - Run dependency vulnerability scanning.
