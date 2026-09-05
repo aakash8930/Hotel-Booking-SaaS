@@ -45,10 +45,11 @@ export class PaymentsController {
    * Returns a redirect URL to send the guest to PhonePe.
    */
   @Post('initiate')
-  async initiatePayment(@Body() body: InitiatePaymentDto) {
+  async initiatePayment(@Body() body: InitiatePaymentDto, @Headers('x-booking-access-token') accessToken?: string) {
     const result = await this.paymentsService.initiatePayment(
       body.bookingId,
       (body.method as PaymentMethod) ?? undefined,
+      accessToken,
     );
     return {
       success: true,
@@ -63,8 +64,8 @@ export class PaymentsController {
    * Frontend calls this after the guest returns from payment page.
    */
   @Get('verify/:paymentId')
-  async verifyPayment(@Param('paymentId') paymentId: string) {
-    const result = await this.paymentsService.verifyPayment(paymentId);
+  async verifyPayment(@Param('paymentId') paymentId: string, @Headers('x-booking-access-token') accessToken?: string) {
+    const result = await this.paymentsService.verifyPayment(paymentId, accessToken);
     return {
       success: true,
       data: result,
