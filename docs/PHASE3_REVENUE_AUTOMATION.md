@@ -50,3 +50,7 @@ Added PricingApproval persistence and protected host APIs:
 - PATCH /host/pricing-approvals/:id/decision
 
 Each decision records the property, host, effective date, room, previous price, proposed price, action, reason, status, and decision timestamp. A decision cannot be finalized twice. This milestone records decisions but intentionally does not mutate live room prices yet.
+
+## Milestone 6: premium pricing decision workspace
+
+Added /host/pricing with a premium host-facing calendar-style decision table, 30-day recommendation summary, demand/pace details, recommendation drawer, explicit approval action, refresh/error/loading states, and recent decision history. Live prices remain unchanged until the execution milestone.
