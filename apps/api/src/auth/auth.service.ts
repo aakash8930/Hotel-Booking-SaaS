@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { prisma } from '@hbs/prisma';
 import type { RegisterDto } from './dto/register.dto';
 import type { LoginDto } from './dto/login.dto';
@@ -116,7 +117,7 @@ export class AuthService {
    * Refresh an expired access token using a valid refresh token.
    */
   async refreshToken(refreshToken: string): Promise<AuthResponse> {
-    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
 
     // Find the stored refresh token
     const stored = await prisma.refreshToken.findFirst({
