@@ -456,3 +456,5 @@ select option {
   .premium-nav-actions { gap:7px; }
   .nav-signin { padding:9px 11px; }
 }
+
+.footer-manifesto { max-width:360px; margin-top:10px !important; color:#4f4b46 !important; font-size:11px !important; line-height:1.7; }
