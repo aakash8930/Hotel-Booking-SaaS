@@ -6,7 +6,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { initSentry } from './common/sentry';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
