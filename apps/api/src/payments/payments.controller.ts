@@ -20,6 +20,7 @@ import {
   Body,
   Param,
   Headers,
+  Req,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -30,6 +31,7 @@ import { PhonePeService } from './phonepe.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BookingStatus, PaymentMethod } from '@hbs/prisma';
+import type { Request } from 'express';
 
 @Controller('payments')
 export class PaymentsController {
@@ -89,9 +91,10 @@ export class PaymentsController {
   async handlePhonePeWebhook(
     @Body() body: any,
     @Headers('x-verify') signature: string,
+    @Req() req: Request & { rawBody?: Buffer },
   ) {
     // ── Validate webhook signature ─────────────────────────────────────
-    const rawBody = JSON.stringify(body);
+    const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(body));
     const isValid = this.phonepe.validateWebhookSignature(rawBody, signature);
 
     if (!isValid) {
