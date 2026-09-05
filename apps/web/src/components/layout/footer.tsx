@@ -2,20 +2,21 @@ import Link from 'next/link';
 
 export function Footer() {
   return (
-    <footer className="border-t border-surface-200 bg-surface-50">
-      <div className="container-custom py-10 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-surface-500">
-        <p>© {new Date().getFullYear()} StayEase. Independent hotels &amp; homestays, booked directly.</p>
-        <div className="flex gap-6">
-          <Link href="/legal/terms" className="hover:text-brand-300 hover:underline transition-colors">
-            Terms
-          </Link>
-          <Link href="/legal/privacy" className="hover:text-brand-300 hover:underline transition-colors">
-            Privacy
-          </Link>
-          <Link href="/legal/cancellation-refund" className="hover:text-brand-300 hover:underline transition-colors">
-            Cancellation &amp; Refunds
-          </Link>
+    <footer className="premium-footer">
+      <div className="container-premium footer-top">
+        <div>
+          <Link href="/" className="premium-logo footer-logo"><span className="logo-mark">S</span><span>StayEase</span></Link>
+          <p>Independent stays. Directly yours.</p>
         </div>
+        <div className="footer-links">
+          <div><span>Explore</span><Link href="/search">Find a stay</Link><Link href="/account/trips">My trips</Link></div>
+          <div><span>Hosts</span><Link href="/host/register">List your property</Link><Link href="/host/properties">Host dashboard</Link></div>
+          <div><span>Legal</span><Link href="/legal/terms">Terms</Link><Link href="/legal/privacy">Privacy</Link></div>
+        </div>
+      </div>
+      <div className="container-premium footer-bottom">
+        <span>© {new Date().getFullYear()} StayEase</span>
+        <span>Made for the places worth finding.</span>
       </div>
     </footer>
   );
