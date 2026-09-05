@@ -17,9 +17,10 @@ Existing refresh tokens created by older builds used salted bcrypt hashes and ca
 
 ## Remaining production gates
 
-- Protect public booking/payment mutation endpoints with a booking access token or authenticated guest ownership model.
-- Validate payment webhook signatures against the exact provider signing scheme and preserve the raw request body where required.
-- Add payment amount/currency reconciliation before marking a payment successful.
+- ✅ Protect public booking read/cancel/confirm/payment operations with a 256-bit opaque booking capability token; only its SHA-256 hash is persisted.
+- ✅ Preserve the raw request body for webhook verification and reconcile provider webhook amount against the persisted payment amount when supplied.
+- Verify the exact PhonePe signing scheme against current provider documentation before production credentials are enabled.
+- Add currency reconciliation and reject missing provider amount fields if the live provider contract guarantees them.
 - Add refund retry/reconciliation state instead of treating a provider call as immediately settled.
 - Verify admin authorization on every sensitive admin route.
 - Add secure cookie/session strategy if tokens are moved out of browser storage.
