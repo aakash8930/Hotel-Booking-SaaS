@@ -106,7 +106,7 @@ function HostBookingsView() {
   }
 
   return (
-    <div className="container-custom pt-28 pb-16 md:pt-32 max-w-5xl">
+    <div className="container-custom pt-28 pb-20 md:pt-32 max-w-6xl premium-host-page">
       <button
         onClick={() => router.push('/host/properties')}
         className="text-sm text-surface-500 mb-4 hover:text-surface-800 hover:underline transition-colors"
