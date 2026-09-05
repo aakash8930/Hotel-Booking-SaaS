@@ -34,3 +34,8 @@ Recommendations are deterministic and transparent in this first release. They ar
 5. Occupancy and ADR/RevPAR metrics
 6. AI explanation layer grounded in these metrics
 7. One-click price-rule proposals with explicit host approval
+
+
+## UI milestone
+
+The first premium host-facing Revenue Intelligence dashboard is now available at /host/revenue. It presents KPI cards, a 14-day demand visualization, actionable recommendation cards, and room-level economics.
