@@ -188,7 +188,7 @@ func (h *Hub) run() {
 
 // ── WebSocket Upgrader ─────────────────────────────────────────────────────
 
-var upgrader = websocket.Upgrader{
+func newUpgrader(allowedOrigin string) websocket.Upgrader {\n\tallowed := map[string]bool{}\n\tfor _, origin := range strings.Split(allowedOrigin, ",") {\n\t\tallowed[strings.TrimSpace(origin)] = true\n\t}\n\treturn websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
@@ -330,7 +330,7 @@ func main() {
 
 	// WebSocket endpoint
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
+		serveWs(hub, upgrader, w, r)
 	})
 
 	// Health check
