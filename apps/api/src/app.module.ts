@@ -59,7 +59,6 @@ import { InvoicesModule } from './invoices/invoices.module';
     AdminModule,
     InvoicesModule,
   ],
-})
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
