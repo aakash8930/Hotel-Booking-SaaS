@@ -39,3 +39,7 @@ Recommendations are deterministic and transparent in this first release. They ar
 ## UI milestone
 
 The first premium host-facing Revenue Intelligence dashboard is now available at /host/revenue. It presents KPI cards, a 14-day demand visualization, actionable recommendation cards, and room-level economics.
+
+## Metrics milestone
+
+The revenue API and dashboard now expose occupancy rate, ADR, RevPAR, and seven-day booking pickup alongside revenue and demand signals. These form the analytical foundation for the future AI copilot.
