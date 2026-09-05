@@ -157,6 +157,7 @@ model Property {
   reviews Review[]
   pricingRules PricingRule[]
   pricingApprovals PricingApproval[]
+  roomPrices DailyRoomPrice[]
 
   @@index([hostId])
   @@index([city, state])
@@ -182,6 +183,7 @@ model Room {
 
   property Property @relation(fields: [propertyId], references: [id])
   bookings Booking[]
+  dailyPrices DailyRoomPrice[]
 
   @@index([propertyId])
   @@map("rooms")
@@ -508,3 +510,25 @@ model PricingApproval {
 
 enum PricingApprovalAction { INCREASE DECREASE HOLD }
 enum PricingApprovalStatus { PENDING APPROVED REJECTED }
+
+
+model DailyRoomPrice {
+  id          String   @id @default(uuid()) @db.Uuid
+  roomId      String   @map("room_id") @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  effectiveDate DateTime @map("effective_date") @db.Date
+  price       Decimal  @db.Decimal(10, 2)
+  previousPrice Decimal? @map("previous_price") @db.Decimal(10, 2)
+  source      DailyPriceSource @default(BASE)
+  approvalId  String?  @map("approval_id") @db.Uuid
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  room        Room @relation(fields: [roomId], references: [id])
+  property    Property @relation(fields: [propertyId], references: [id])
+  @@unique([roomId, effectiveDate])
+  @@index([propertyId, effectiveDate])
+  @@map("daily_room_prices")
+}
+
+enum DailyPriceSource { BASE MANUAL APPROVED_RULE }
