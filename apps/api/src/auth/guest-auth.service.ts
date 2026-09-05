@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, ConflictException, Logger } from '@n
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { prisma } from '@hbs/prisma';
 import type { GuestRegisterDto } from './dto/guest-register.dto';
 import type { GuestLoginDto } from './dto/guest-login.dto';
@@ -92,7 +93,7 @@ export class GuestAuthService {
   }
 
   async refreshToken(refreshToken: string): Promise<GuestAuthResponse> {
-    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
 
     const stored = await prisma.guestRefreshToken.findFirst({
       where: { tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
