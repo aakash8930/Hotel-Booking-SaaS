@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 type Insight = {
   property: { id: string; name: string; currency: string };
   summary: { revenue30d: number; bookings30d: number; confirmedBookings30d: number; cancellations30d: number; averageBookingValue: number };
+  metrics: { occupancyRate30d: number; adr30d: number; revpar30d: number; pickup7d: number };
   roomStats: Array<{ roomId: string; roomName: string; basePrice: number; bookings: number; bookedNights: number; revenue: number }>;
   demandForecast: Array<{ date: string; bookedRooms: number; availableRooms: number; demandRatio: number }>;
   recommendations: Array<{ type: string; priority: string; title: string; message: string }>;
@@ -40,11 +41,15 @@ export default function RevenuePage() {
   return <main className="min-h-screen bg-background p-5 md:p-10"><div className="mx-auto max-w-7xl space-y-7">
     <header className="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><p className="text-sm font-medium text-muted-foreground">Revenue Intelligence</p><h1 className="mt-1 text-4xl font-semibold tracking-tight">{insight.property.name}</h1><p className="mt-2 text-muted-foreground">Performance, demand and the next decision worth making.</p></div><div className="rounded-full border bg-card px-4 py-2 text-sm text-muted-foreground">Live property signal</div></header>
 
-    <section className="grid gap-4 md:grid-cols-4">{[
+    <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{[
       ['Revenue · 30d', money(insight.summary.revenue30d), 'Collected from paid stays'],
       ['Bookings · 30d', insight.summary.bookings30d.toString(), 'All non-expired bookings'],
       ['Confirmed', insight.summary.confirmedBookings30d.toString(), 'Confirmed or paid stays'],
       ['Avg. booking', money(insight.summary.averageBookingValue), 'Average booking value'],
+      ['Occupancy', insight.metrics.occupancyRate30d + '%', 'Last 30 days'],
+      ['ADR', money(insight.metrics.adr30d), 'Average daily rate'],
+      ['RevPAR', money(insight.metrics.revpar30d), 'Revenue per available room'],
+      ['Pickup · 7d', insight.metrics.pickup7d.toString(), 'Bookings created this week'],
     ].map(([label,value,note]) => <article key={label} className="rounded-3xl border bg-card p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight">{value}</p><p className="mt-2 text-xs text-muted-foreground">{note}</p></article>)}</section>
 
     <section className="grid gap-5 lg:grid-cols-[1.6fr_1fr]"><article className="rounded-3xl border bg-card p-6 shadow-sm"><div><h2 className="text-lg font-semibold">Demand outlook</h2><p className="text-sm text-muted-foreground">Next 14 days based on current reservations</p></div><div className="mt-8 flex h-64 items-end gap-2 overflow-hidden">{insight.demandForecast.map((d,i) => <div key={d.date} className="group flex min-w-0 flex-1 flex-col items-center justify-end gap-2"><div className="relative w-full max-w-9 rounded-t-xl bg-foreground/10 transition-all duration-500 group-hover:bg-foreground/20" style={{height: Math.max(8,(d.demandRatio/maxDemand)*190)}}><div className="absolute inset-x-0 bottom-0 rounded-t-xl bg-foreground/70" style={{height: Math.min(100,d.demandRatio)+'%'}} /></div><span className="text-[10px] text-muted-foreground">{new Date(d.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span>{i%2===0 && <span className="text-[10px] font-medium">{d.demandRatio}%</span>}</div>)}</div></article>
