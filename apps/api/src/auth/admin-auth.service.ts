@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { prisma } from '@hbs/prisma';
 import type { AdminLoginDto } from './dto/admin-login.dto';
 
@@ -52,7 +53,7 @@ export class AdminAuthService {
   }
 
   async refreshToken(refreshToken: string): Promise<AdminAuthResponse> {
-    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
 
     const stored = await prisma.adminRefreshToken.findFirst({
       where: { tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
