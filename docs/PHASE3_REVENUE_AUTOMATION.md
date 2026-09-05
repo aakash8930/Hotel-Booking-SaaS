@@ -37,3 +37,7 @@ Added GET /host/pricing-calendar/:propertyId with a 1–90 day window. The servi
 ## Milestone 3: booking pace engine
 
 Added GET /host/booking-pace/:propertyId. It compares reservation pickup in the latest 7-day window against the preceding 7-day window for each future date, producing accelerating, slowing, or stable pace signals. The output includes booked rooms, occupancy, current pickup, prior pickup, and pace delta.
+
+## Milestone 4: revenue recommendation engine
+
+Added GET /host/revenue-recommendations/:propertyId. For each future date it combines forward occupancy and recent-vs-prior booking pickup to produce an explainable INCREASE, HOLD, or DECREASE recommendation with adjustment percentage, confidence, and reason. This is advisory only; it does not change live booking prices.
