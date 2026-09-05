@@ -209,7 +209,7 @@ type RealtimeEvent struct {
 
 // ── Handlers ───────────────────────────────────────────────────────────────
 
-func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+func serveWs(hub *Hub, upgrader websocket.Upgrader, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
