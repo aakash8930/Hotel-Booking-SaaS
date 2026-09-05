@@ -96,7 +96,7 @@ export class AdminAuthService {
     const refreshToken = this.jwtService.sign(
       { ...payload, type: 'refresh' },
       {
-        secret: this.config.get<string>('JWT_REFRESH_SECRET', 'dev-refresh-secret-change-me'),
+        secret: this.config.get<string>('JWT_REFRESH_SECRET') ?? (process.env.NODE_ENV === 'production' ? (() => { throw new Error('JWT_REFRESH_SECRET is required in production'); })() : 'dev-refresh-secret-change-me'),
         expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRES_IN', '30d'),
       },
     );
