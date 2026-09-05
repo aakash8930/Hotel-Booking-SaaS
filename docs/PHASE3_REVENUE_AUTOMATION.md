@@ -28,3 +28,8 @@ Next:
 3. recommendation-to-rule workflow
 4. explicit approval + audit log
 5. rollback/versioning
+
+
+## Milestone 2: demand-aware pricing calendar
+
+Added GET /host/pricing-calendar/:propertyId with a 1–90 day window. The service calculates occupied rooms per date, derives demand percentage, resolves applicable active pricing rules, and produces per-room suggested prices. This is a preview/simulation layer; booking prices remain unchanged until explicit approval and audit controls are implemented.
