@@ -569,3 +569,9 @@ select option {
 .premium-callback-page .card { box-shadow:0 30px 100px rgba(0,0,0,.35); }
 .premium-billing-page .card h2,.premium-property-editor .card h2,
 .premium-admin-page .card h2 { font-family:var(--serif); font-weight:400; letter-spacing:-.035em; }
+
+@media print {
+  body { background:white !important; color:#111 !important; }
+  .premium-header,.premium-footer { display:none !important; }
+  .premium-app-shell { background:white !important; }
+}
