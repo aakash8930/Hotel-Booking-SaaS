@@ -276,3 +276,156 @@ h2 em, h1 em { display: block; color: var(--gold-light); font-style: normal; }
   .footer-links div:last-child { grid-column: 1 / -1; }
   .footer-bottom { flex-direction: column; gap: 8px; }
 }
+
+
+/* ─────────────────────────────────────────────────────────
+   STAYEASE PREMIUM PRODUCT SYSTEM
+   Shared visual language for search, booking, account, host,
+   admin and legal surfaces.
+   ───────────────────────────────────────────────────────── */
+:root {
+  --surface-950: #090807;
+  --surface-900: #0e0d0c;
+  --surface-850: #12100f;
+  --surface-800: #171513;
+  --surface-700: #211e1a;
+  --surface-500: #777169;
+  --surface-300: #b8b0a5;
+  --surface-100: #f2ede4;
+  --brand-500: #c89445;
+  --brand-400: #e4b86b;
+}
+
+body {
+  background:
+    radial-gradient(circle at 8% 4%, rgba(200,148,69,.07), transparent 28rem),
+    radial-gradient(circle at 92% 16%, rgba(200,148,69,.045), transparent 30rem),
+    var(--ink);
+  color: var(--paper);
+}
+
+body > div {
+  animation: pageReveal .7s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes pageReveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.container-custom {
+  width: min(1180px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+.card {
+  background: linear-gradient(145deg, rgba(24,22,20,.92), rgba(14,13,12,.96));
+  border: 1px solid rgba(255,255,255,.085);
+  border-radius: 18px;
+  box-shadow: 0 18px 70px rgba(0,0,0,.22);
+  color: var(--paper);
+  transition: border-color .35s, transform .35s, box-shadow .35s;
+}
+.card:hover {
+  border-color: rgba(228,184,107,.22);
+  box-shadow: 0 25px 90px rgba(0,0,0,.28);
+}
+
+.input, select.input, textarea.input {
+  min-height: 46px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 11px;
+  background: rgba(255,255,255,.035);
+  color: var(--paper);
+  outline: none;
+  transition: border-color .25s, background .25s, box-shadow .25s;
+}
+.input:focus, select.input:focus, textarea.input:focus {
+  border-color: rgba(228,184,107,.65);
+  background: rgba(255,255,255,.055);
+  box-shadow: 0 0 0 4px rgba(200,148,69,.09);
+}
+.input::placeholder { color: #625d56; }
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,.045);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all .3s cubic-bezier(.16,1,.3,1);
+}
+.btn-secondary:hover {
+  transform: translateY(-2px);
+  border-color: rgba(228,184,107,.35);
+  background: rgba(228,184,107,.08);
+}
+
+main, [role="main"] { min-height: 100%; }
+
+.page-title {
+  font: 400 clamp(42px, 6vw, 76px)/.95 var(--serif);
+  letter-spacing: -.05em;
+}
+.section-title {
+  font: 400 clamp(32px, 4vw, 52px)/1 var(--serif);
+  letter-spacing: -.04em;
+}
+.premium-divider {
+  height: 1px;
+  background: linear-gradient(90deg, rgba(228,184,107,.4), rgba(255,255,255,.08), transparent);
+}
+
+table { border-collapse: separate; border-spacing: 0; }
+table th {
+  color: #777169;
+  font-size: 10px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+table td { color: #d1cbc2; border-color: rgba(255,255,255,.07) !important; }
+
+input[type="checkbox"], input[type="radio"] { accent-color: var(--gold-light); }
+
+select option {
+  background: #151311;
+  color: #f3eee5;
+}
+
+.prose-premium, .legal-page {
+  color: #aaa39a;
+}
+.prose-premium h1, .prose-premium h2, .prose-premium h3,
+.legal-page h1, .legal-page h2, .legal-page h3 {
+  color: var(--paper);
+  font-family: var(--serif);
+  letter-spacing: -.035em;
+}
+.legal-page a { color: var(--gold-light); }
+
+.sticky-booking {
+  background: rgba(14,13,12,.88);
+  border: 1px solid rgba(228,184,107,.2);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 25px 90px rgba(0,0,0,.38);
+}
+
+@media (max-width: 700px) {
+  .container-custom { width: calc(100% - 28px); }
+  .card { border-radius: 15px; }
+  body > div { animation-duration: .45s; }
+}
+
+/* Premium loading / empty states */
+.animate-pulse {
+  background-image: linear-gradient(90deg, rgba(255,255,255,.025), rgba(255,255,255,.07), rgba(255,255,255,.025));
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
