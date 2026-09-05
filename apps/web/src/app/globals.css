@@ -575,3 +575,19 @@ select option {
   .premium-header,.premium-footer { display:none !important; }
   .premium-app-shell { background:white !important; }
 }
+
+/* Final QA: prevent motion/layout regressions */
+img { max-width:100%; }
+button, a { -webkit-tap-highlight-color:transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline:2px solid rgba(228,184,107,.72);
+  outline-offset:3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior:auto !important;
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+  }
+}
