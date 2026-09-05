@@ -41,3 +41,12 @@ Added GET /host/booking-pace/:propertyId. It compares reservation pickup in the 
 ## Milestone 4: revenue recommendation engine
 
 Added GET /host/revenue-recommendations/:propertyId. For each future date it combines forward occupancy and recent-vs-prior booking pickup to produce an explainable INCREASE, HOLD, or DECREASE recommendation with adjustment percentage, confidence, and reason. This is advisory only; it does not change live booking prices.
+
+## Milestone 5: explicit approval and audit trail
+
+Added PricingApproval persistence and protected host APIs:
+- POST /host/pricing-approvals/:propertyId
+- GET /host/pricing-approvals/:propertyId
+- PATCH /host/pricing-approvals/:id/decision
+
+Each decision records the property, host, effective date, room, previous price, proposed price, action, reason, status, and decision timestamp. A decision cannot be finalized twice. This milestone records decisions but intentionally does not mutate live room prices yet.
