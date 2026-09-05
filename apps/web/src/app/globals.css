@@ -549,3 +549,23 @@ select option {
   .premium-property-page .relative.h-\[42vh\] { min-height:440px; }
   .premium-booking-page > form,.premium-form-page form { padding:22px; border-radius:18px; }
 }
+
+.premium-payment-page,.premium-invoice-page,.premium-callback-page,.premium-billing-page,.premium-property-editor,
+.premium-admin-page,.premium-auth-page {
+  animation: routeRise .7s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes routeRise { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
+.premium-payment-page .card,.premium-invoice-page .card,.premium-callback-page .card,
+.premium-billing-page .card,.premium-property-editor .card { border-radius:20px; }
+.premium-payment-page button,.premium-billing-page button,.premium-property-editor button,
+.premium-admin-page button,.premium-auth-page button {
+  transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s, background .25s;
+}
+.premium-payment-page button:hover,.premium-billing-page button:hover,.premium-property-editor button:hover,
+.premium-admin-page button:hover,.premium-auth-page button:hover { transform:translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,.2); }
+.premium-invoice-page { color:#d5cec4; }
+.premium-invoice-page table { width:100%; }
+.premium-callback-page { display:grid; place-items:center; min-height:70vh; }
+.premium-callback-page .card { box-shadow:0 30px 100px rgba(0,0,0,.35); }
+.premium-billing-page .card h2,.premium-property-editor .card h2,
+.premium-admin-page .card h2 { font-family:var(--serif); font-weight:400; letter-spacing:-.035em; }
