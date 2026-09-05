@@ -35,3 +35,17 @@ Existing refresh tokens created by older builds used salted bcrypt hashes and ca
 ## Production rule
 
 Never deploy with development JWT fallback secrets, wildcard WebSocket origins, or unrestricted CORS. Keep `APP_CORS_ORIGINS` and `WS_ALLOWED_ORIGIN` restricted to the real application origins.
+
+
+## Final gate status
+
+Phase 1 implementation hardening is complete for the code changes covered by this branch. Runtime production approval remains conditional on executing the CI gate successfully with real infrastructure.
+
+Required before declaring production-ready:
+- CI build/test/audit green
+- Go realtime test/build green
+- Live payment-provider signature contract verified with provider credentials
+- Database migration applied and rollback/backup tested
+- Load test completed against production-like PostgreSQL/Redis
+- HTTPS/TLS and HSTS configured at the edge
+- Monitoring/alerts verified
