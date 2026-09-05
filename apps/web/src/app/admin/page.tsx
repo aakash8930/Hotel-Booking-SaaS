@@ -37,7 +37,7 @@ function AdminDashboardView() {
   }, []);
 
   return (
-    <div className="container-custom pt-28 pb-16 md:pt-32 max-w-5xl">
+    <div className="container-custom pt-28 pb-16 md:pt-32 max-w-6xl premium-admin-page">
       <AdminNav />
       <h1 className="font-display text-3xl md:text-4xl font-bold text-surface-900 mb-8">Dashboard</h1>
 
