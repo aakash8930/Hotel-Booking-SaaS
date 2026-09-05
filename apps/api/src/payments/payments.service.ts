@@ -129,7 +129,9 @@ export class PaymentsService {
       },
     });
 
-    const phonepeResponse = await this.phonepe.initiatePayment({
+    let phonepeResponse;
+    try {
+      phonepeResponse = await this.phonepe.initiatePayment({
       transactionId,
       amount: amountPaise,
       callbackUrl: `${appUrl}/booking/${bookingId}/payment-callback?paymentId=${payment.id}`,
@@ -138,7 +140,18 @@ export class PaymentsService {
       guestEmail: booking.guest.email,
       method,
       ...(booking.guest.phone ? { guestPhone: booking.guest.phone } : {}),
-    });
+      });
+    } catch (error) {
+      await prisma.$transaction([
+        prisma.payment.update({ where: { id: payment.id }, data: { status: PaymentStatus.FAILED, completedAt: new Date() } }),
+        prisma.booking.update({ where: { id: bookingId }, data: { status: BookingStatus.CANCELLED, cancelledAt: new Date(), cancellationReason: 'Payment provider initiation failed' } }),
+      ]);
+      this.logger.error(
+        `Payment provider initiation failed for booking ${bookingId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new BadRequestException('Payment provider is temporarily unavailable. Please try again.');
+    }
 
     this.logger.log(
       `Payment initiated: ${payment.id} | txn: ${transactionId} | ₹${booking.totalPrice}`,
