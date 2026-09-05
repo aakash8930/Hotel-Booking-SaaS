@@ -60,3 +60,10 @@ Added /host/pricing with a premium host-facing calendar-style decision table, 30
 Added DailyRoomPrice as a dated, per-room price version. Approved pricing can now be applied transactionally through POST /host/pricing-execution/approval/:id/apply. Each version stores the prior price and increments a version number. POST /host/pricing-execution/version/:id/rollback restores the previous price while preserving the replaced value. GET /host/pricing-execution/:propertyId exposes dated live-price versions. A quote helper also resolves nightly rates with base-price fallback.
 
 Live booking integration remains the final execution step: booking creation must call the quote path before persisting totalPrice, and that integration should be tested against overlapping bookings and pricing changes.
+
+## Milestone 8: booking price integration
+
+Booking creation now resolves DailyRoomPrice for each night of a stay, falling back to Room.basePrice when no dated override exists. Mixed-rate stays are summed nightly before Booking.totalPrice is persisted. Added a focused test scaffold for mixed rates, fallback behavior, price immutability after booking, and concurrency coverage.
+
+### Phase 3 core status
+Revenue intelligence → recommendation → approval → dated price execution → booking total integration is now connected. The remaining work is verification: run database migrations, compile/typecheck the monorepo, execute the dynamic-pricing and existing concurrency suites, then fix any integration failures before declaring Phase 3 production-ready.
