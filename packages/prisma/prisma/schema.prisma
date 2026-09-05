@@ -294,6 +294,10 @@ model Booking {
   payout   Payout? @relation(fields: [payoutId], references: [id])
   payoutId String? @map("payout_id") @db.Uuid
 
+  // Hashed capability token for anonymous guest access to this booking.
+  // Never store the raw token; the raw value is returned only at booking creation.
+  accessTokenHash String? @unique @map("access_token_hash")
+
   @@index([roomId, status])
   @@index([guestId])
   @@index([holdExpiresAt])
