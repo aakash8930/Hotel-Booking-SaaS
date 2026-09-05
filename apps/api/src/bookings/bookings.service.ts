@@ -15,6 +15,7 @@ import { RealtimeService } from '../realtime/realtime.service';
 import { PaymentsService } from '../payments/payments.service';
 import { WhatsAppService } from '../payments/whatsapp.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 
 /** Duration of the soft-hold: 10 minutes to complete payment. */
 const HOLD_DURATION_MS = 10 * 60 * 1000;
@@ -73,6 +74,9 @@ export class BookingsService {
     const holdExpiresAt = new Date(Date.now() + HOLD_DURATION_MS);
 
     try {
+      const rawAccessToken = randomBytes(32).toString('base64url');
+      const accessTokenHash = createHash('sha256').update(rawAccessToken).digest('hex');
+
       const booking = await this.createBookingWithDeadlockRetry({
         data: {
           roomId: dto.roomId,
@@ -85,6 +89,7 @@ export class BookingsService {
           totalPrice,
           currency: room.currency,
           specialRequests: dto.specialRequests ?? null,
+          accessTokenHash,
         },
         include: {
           room: {
@@ -119,7 +124,7 @@ export class BookingsService {
         checkOut: dto.checkOut,
       });
 
-      return { ...booking, nights, holdDurationMinutes: HOLD_DURATION_MS / 60_000 };
+      return { ...booking, nights, holdDurationMinutes: HOLD_DURATION_MS / 60_000, accessToken: rawAccessToken };
     } catch (error: unknown) {
       return this.handleBookingError(error);
     }
@@ -128,7 +133,8 @@ export class BookingsService {
   /**
    * Get a booking by ID.
    */
-  async findOne(bookingId: string) {
+  async findOne(bookingId: string, accessToken?: string) {
+    await this.assertBookingAccess(bookingId, accessToken);
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
@@ -166,7 +172,8 @@ export class BookingsService {
    * PaymentsService.initiatePayment(). This endpoint exists
    * for backwards compatibility and testing.
    */
-  async confirm(bookingId: string) {
+  async confirm(bookingId: string, accessToken?: string) {
+    await this.assertBookingAccess(bookingId, accessToken);
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
     });
@@ -206,7 +213,8 @@ export class BookingsService {
    * actually cancelling — lets the UI show "you'll get ₹X back" before
    * the guest confirms.
    */
-  async previewCancellation(bookingId: string) {
+  async previewCancellation(bookingId: string, accessToken?: string) {
+    await this.assertBookingAccess(bookingId, accessToken);
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: { room: { select: { property: { select: { cancellationPolicy: true } } } } },
@@ -222,7 +230,8 @@ export class BookingsService {
   /**
    * Cancel a booking — uses state machine to validate transition.
    */
-  async cancel(bookingId: string, reason?: string) {
+  async cancel(bookingId: string, reason?: string, accessToken?: string) {
+    await this.assertBookingAccess(bookingId, accessToken);
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
@@ -289,6 +298,18 @@ export class BookingsService {
     });
 
     return { ...updated, refund };
+  }
+
+  /** Verify the opaque anonymous-booking capability token. */
+  private async assertBookingAccess(bookingId: string, accessToken?: string): Promise<void> {
+    if (!accessToken) throw new ForbiddenException('Booking access token required');
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId }, select: { accessTokenHash: true } });
+    if (!booking?.accessTokenHash) throw new ForbiddenException('Invalid booking access token');
+    const supplied = Buffer.from(createHash('sha256').update(accessToken).digest('hex'));
+    const stored = Buffer.from(booking.accessTokenHash);
+    if (supplied.length !== stored.length || !timingSafeEqual(supplied, stored)) {
+      throw new ForbiddenException('Invalid booking access token');
+    }
   }
 
   /**
