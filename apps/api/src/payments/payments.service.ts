@@ -195,6 +195,17 @@ export class PaymentsService {
       },
     });
 
+    if (payment?.amount && params.amount != null) {
+      const receivedAmount = Number(params.amount);
+      const expectedPaise = Math.round(Number(payment.amount) * 100);
+      if (receivedAmount !== expectedPaise) {
+        this.logger.error(
+          `Webhook amount mismatch for ${transactionId}: expected ${expectedPaise} paise, received ${receivedAmount}`,
+        );
+        return { processed: false, message: 'Payment amount mismatch' };
+      }
+    }
+
     if (!payment) {
       this.logger.warn(`Webhook received for unknown transaction: ${transactionId}`);
       return { processed: false, message: 'Payment not found' };
