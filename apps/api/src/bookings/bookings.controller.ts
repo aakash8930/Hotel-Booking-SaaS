@@ -54,8 +54,8 @@ export class BookingsController {
    * In production, you'd want to scope this to the guest who made it.
    */
   @Get('bookings/:id')
-  async findOne(@Param('id') id: string) {
-    const booking = await this.bookingsService.findOne(id);
+  async findOne(@Param('id') id: string, @Headers('x-booking-access-token') accessToken?: string) {
+    const booking = await this.bookingsService.findOne(id, accessToken);
     return { success: true, data: booking };
   }
 
@@ -64,8 +64,8 @@ export class BookingsController {
    */
   @Post('bookings/:id/confirm')
   @HttpCode(HttpStatus.OK)
-  async confirm(@Param('id') id: string) {
-    const booking = await this.bookingsService.confirm(id);
+  async confirm(@Param('id') id: string, @Headers('x-booking-access-token') accessToken?: string) {
+    const booking = await this.bookingsService.confirm(id, accessToken);
     return { success: true, data: booking };
   }
 
@@ -73,8 +73,8 @@ export class BookingsController {
    * Preview the refund a cancellation would produce right now.
    */
   @Get('bookings/:id/cancellation-preview')
-  async previewCancellation(@Param('id') id: string) {
-    const refund = await this.bookingsService.previewCancellation(id);
+  async previewCancellation(@Param('id') id: string, @Headers('x-booking-access-token') accessToken?: string) {
+    const refund = await this.bookingsService.previewCancellation(id, accessToken);
     return { success: true, data: refund };
   }
 
@@ -86,8 +86,9 @@ export class BookingsController {
   async cancel(
     @Param('id') id: string,
     @Body('reason') reason?: string,
+    @Headers('x-booking-access-token') accessToken?: string,
   ) {
-    const booking = await this.bookingsService.cancel(id, reason);
+    const booking = await this.bookingsService.cancel(id, reason, accessToken);
     return { success: true, data: booking };
   }
 
