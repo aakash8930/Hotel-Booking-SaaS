@@ -48,7 +48,7 @@ function GuestLoginForm() {
   }
 
   return (
-    <div className="container-custom pt-28 pb-16 md:pt-32 max-w-md">
+    <div className="container-custom pt-32 pb-24 md:pt-40 max-w-md premium-auth-page">
       <h1 className="font-display text-3xl font-bold mb-2 text-surface-900">Sign in</h1>
       <p className="text-surface-500 mb-8">Access your trips and bookings.</p>
 
