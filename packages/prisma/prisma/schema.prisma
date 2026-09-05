@@ -156,6 +156,7 @@ model Property {
   rooms   Room[]
   reviews Review[]
   pricingRules PricingRule[]
+  pricingApprovals PricingApproval[]
 
   @@index([hostId])
   @@index([city, state])
@@ -483,3 +484,27 @@ enum PricingAdjustmentType {
   PERCENT
   FIXED
 }
+
+
+model PricingApproval {
+  id             String   @id @default(uuid()) @db.Uuid
+  propertyId     String   @map("property_id") @db.Uuid
+  ruleId         String?  @map("rule_id") @db.Uuid
+  hostId         String   @map("host_id") @db.Uuid
+  effectiveDate  DateTime @map("effective_date") @db.Date
+  roomId         String?  @map("room_id") @db.Uuid
+  previousPrice  Decimal  @map("previous_price") @db.Decimal(10, 2)
+  proposedPrice  Decimal  @map("proposed_price") @db.Decimal(10, 2)
+  action         PricingApprovalAction
+  reason         String?
+  status         PricingApprovalStatus @default(PENDING)
+  decidedAt      DateTime? @map("decided_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  property       Property @relation(fields: [propertyId], references: [id])
+  @@index([propertyId, effectiveDate, status])
+  @@index([hostId, createdAt])
+  @@map("pricing_approvals")
+}
+
+enum PricingApprovalAction { INCREASE DECREASE HOLD }
+enum PricingApprovalStatus { PENDING APPROVED REJECTED }
