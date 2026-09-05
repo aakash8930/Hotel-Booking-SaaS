@@ -124,14 +124,15 @@ export class BookingsService {
         checkOut: dto.checkOut,
       });
 
-      return { ...booking, nights, holdDurationMinutes: HOLD_DURATION_MS / 60_000, accessToken: rawAccessToken };
+      const { accessTokenHash: _accessTokenHash, ...safeBooking } = booking as typeof booking & { accessTokenHash?: string | null };
+      return { ...safeBooking, nights, holdDurationMinutes: HOLD_DURATION_MS / 60_000, accessToken: rawAccessToken };
     } catch (error: unknown) {
       return this.handleBookingError(error);
     }
   }
 
   /**
-   * Get a booking by ID.
+   * Get a booking by ID. Anonymous access requires the opaque booking capability token.
    */
   async findOne(bookingId: string, accessToken?: string) {
     await this.assertBookingAccess(bookingId, accessToken);
@@ -161,7 +162,8 @@ export class BookingsService {
       throw new NotFoundException('Booking not found');
     }
 
-    return booking;
+    const { accessTokenHash: _accessTokenHash, ...safeBooking } = booking as typeof booking & { accessTokenHash?: string | null };
+    return safeBooking;
   }
 
   /**
