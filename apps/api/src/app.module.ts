@@ -19,6 +19,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { AdminModule } from './admin/admin.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { RevenueInsightsModule } from './revenue-insights/revenue-insights.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { InvoicesModule } from './invoices/invoices.module';
     PayoutsModule,
     AdminModule,
     InvoicesModule,
+    RevenueInsightsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
