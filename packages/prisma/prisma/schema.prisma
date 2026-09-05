@@ -155,6 +155,7 @@ model Property {
   host    Host     @relation(fields: [hostId], references: [id])
   rooms   Room[]
   reviews Review[]
+  pricingRules PricingRule[]
 
   @@index([hostId])
   @@index([city, state])
