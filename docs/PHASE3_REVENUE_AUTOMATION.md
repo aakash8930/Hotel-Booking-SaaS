@@ -54,3 +54,9 @@ Each decision records the property, host, effective date, room, previous price, 
 ## Milestone 6: premium pricing decision workspace
 
 Added /host/pricing with a premium host-facing calendar-style decision table, 30-day recommendation summary, demand/pace details, recommendation drawer, explicit approval action, refresh/error/loading states, and recent decision history. Live prices remain unchanged until the execution milestone.
+
+## Milestone 7: versioned price execution and rollback
+
+Added DailyRoomPrice as a dated, per-room price version. Approved pricing can now be applied transactionally through POST /host/pricing-execution/approval/:id/apply. Each version stores the prior price and increments a version number. POST /host/pricing-execution/version/:id/rollback restores the previous price while preserving the replaced value. GET /host/pricing-execution/:propertyId exposes dated live-price versions. A quote helper also resolves nightly rates with base-price fallback.
+
+Live booking integration remains the final execution step: booking creation must call the quote path before persisting totalPrice, and that integration should be tested against overlapping bookings and pricing changes.
