@@ -43,7 +43,7 @@ export default function GuestRegisterPage() {
   }
 
   return (
-    <div className="container-custom pt-28 pb-16 md:pt-32 max-w-md">
+    <div className="container-custom pt-28 pb-16 md:pt-32 max-w-md premium-auth-page">
       <h1 className="font-display text-3xl font-bold mb-2 text-surface-900">Create an account</h1>
       <p className="text-surface-500 mb-8">
         Track your trips and check out faster next time. If you&apos;ve booked with us before
