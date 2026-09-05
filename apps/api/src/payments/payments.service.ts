@@ -25,7 +25,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { prisma } from '@hbs/prisma';
 import { BookingStatus, PaymentStatus } from '@hbs/prisma';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import type { PaymentMethod } from '@hbs/prisma';
 import { assertCanTransition, canTransition } from '../common/booking-state';
 import { PhonePeService } from './phonepe.service';
@@ -57,7 +57,8 @@ export class PaymentsService {
    *   4. Call PhonePe to get redirect URL
    *   5. Return redirect URL to frontend
    */
-  async initiatePayment(bookingId: string, method: PaymentMethod = 'UPI' as PaymentMethod) {
+  async initiatePayment(bookingId: string, method: PaymentMethod = 'UPI' as PaymentMethod, accessToken?: string) {
+    await this.assertBookingAccess(bookingId, accessToken);
     // ── Fetch booking ──────────────────────────────────────────────────
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -150,6 +151,18 @@ export class PaymentsService {
       amount: Number(booking.totalPrice),
       currency: booking.currency,
     };
+  }
+
+  /** Verify the opaque anonymous-booking capability token. */
+  private async assertBookingAccess(bookingId: string, accessToken?: string): Promise<void> {
+    if (!accessToken) throw new BadRequestException('Booking access token required');
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId }, select: { accessTokenHash: true } });
+    if (!booking?.accessTokenHash) throw new BadRequestException('Invalid booking access token');
+    const supplied = Buffer.from(createHash('sha256').update(accessToken).digest('hex'));
+    const stored = Buffer.from(booking.accessTokenHash);
+    if (supplied.length !== stored.length || !timingSafeEqual(supplied, stored)) {
+      throw new BadRequestException('Invalid booking access token');
+    }
   }
 
   /**
@@ -425,7 +438,7 @@ export class PaymentsService {
    * Verify payment status with PhonePe and update our records.
    * Called by the frontend after redirect back from PhonePe.
    */
-  async verifyPayment(paymentId: string) {
+  async verifyPayment(paymentId: string, accessToken?: string) {
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
       include: { booking: true },
@@ -434,6 +447,8 @@ export class PaymentsService {
     if (!payment) {
       throw new NotFoundException('Payment not found');
     }
+
+    await this.assertBookingAccess(payment.bookingId, accessToken);
 
     // If already processed, return current state
     if (payment.status !== PaymentStatus.INITIATED) {
