@@ -458,3 +458,21 @@ select option {
 }
 
 .footer-manifesto { max-width:360px; margin-top:10px !important; color:#4f4b46 !important; font-size:11px !important; line-height:1.7; }
+
+.premium-app-shell {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.012), transparent 18rem),
+    transparent;
+}
+.premium-app-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 75% 8%, rgba(228,184,107,.035), transparent 24rem),
+    radial-gradient(circle at 15% 42%, rgba(228,184,107,.025), transparent 28rem);
+}
