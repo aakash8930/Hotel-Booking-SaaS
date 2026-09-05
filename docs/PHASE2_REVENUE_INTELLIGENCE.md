@@ -43,3 +43,7 @@ The first premium host-facing Revenue Intelligence dashboard is now available at
 ## Metrics milestone
 
 The revenue API and dashboard now expose occupancy rate, ADR, RevPAR, and seven-day booking pickup alongside revenue and demand signals. These form the analytical foundation for the future AI copilot.
+
+## Phase 2 completion scope
+
+Phase 2 is complete when the revenue intelligence foundation, host dashboard, hotel metrics, transparent recommendations, and AI-ready data contract are implemented. Automated price changes are intentionally excluded: production pricing actions belong to the next phase and require explicit host approval, audit history, and rollback.
