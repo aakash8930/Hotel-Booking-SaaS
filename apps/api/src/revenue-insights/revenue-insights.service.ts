@@ -79,6 +79,20 @@ export class RevenueInsightsService {
         cancellations30d: cancelled,
         averageBookingValue: bookings.length ? Math.round((revenue / Math.max(1, bookings.length)) * 100) / 100 : 0,
       },
+      metrics: {
+        occupancyRate30d: property.rooms.length
+          ? Math.round((bookings.reduce((sum, b) => {
+              const from = Math.max(new Date(b.checkIn).getTime(), start.getTime());
+              const to = Math.min(new Date(b.checkOut).getTime(), now.getTime());
+              return sum + Math.max(0, Math.round((to - from) / 86_400_000));
+            }, 0) / Math.max(1, property.rooms.length * 30)) * 10000) / 100
+          : 0,
+        adr30d: bookings.length
+          ? Math.round((revenue / Math.max(1, bookings.reduce((sum, b) => sum + Math.max(1, Math.round((new Date(b.checkOut).getTime() - new Date(b.checkIn).getTime()) / 86_400_000)), 0))) * 100) / 100
+          : 0,
+        revpar30d: property.rooms.length ? Math.round((revenue / Math.max(1, property.rooms.length * 30)) * 100) / 100 : 0,
+        pickup7d: bookings.filter(b => new Date(b.createdAt).getTime() >= now.getTime() - 7 * 86_400_000).length,
+      },
       roomStats, demandForecast, recommendations, generatedAt: new Date().toISOString(),
     };
   }
