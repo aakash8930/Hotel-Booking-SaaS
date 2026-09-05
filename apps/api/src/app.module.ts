@@ -24,6 +24,7 @@ import { PricingRulesModule } from './pricing-rules/pricing-rules.module';
 import { PricingCalendarModule } from './pricing-calendar/pricing-calendar.module';
 import { BookingPaceModule } from './booking-pace/booking-pace.module';
 import { RevenueRecommendationsModule } from './revenue-recommendations/revenue-recommendations.module';
+import { PricingApprovalsModule } from './pricing-approvals/pricing-approvals.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { RevenueRecommendationsModule } from './revenue-recommendations/revenue-
     PricingCalendarModule,
     BookingPaceModule,
     RevenueRecommendationsModule,
+    PricingApprovalsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
