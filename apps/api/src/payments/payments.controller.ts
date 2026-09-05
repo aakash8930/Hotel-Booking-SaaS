@@ -25,6 +25,7 @@ import {
   HttpStatus,
   UseGuards,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PhonePeService } from './phonepe.service';
@@ -146,6 +147,10 @@ export class PaymentsController {
       reason?: string;
     },
   ) {
+    if (body.targetStatus === BookingStatus.REFUNDED || body.targetStatus === BookingStatus.CANCELLED) {
+      throw new ForbiddenException('Use the dedicated cancellation/refund workflow for financial state changes');
+    }
+
     const result = await this.paymentsService.transitionBooking(
       body.bookingId,
       body.targetStatus,
