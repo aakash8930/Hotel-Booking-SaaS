@@ -60,7 +60,7 @@ export default function RootLayout({
       <body className="font-sans flex flex-col min-h-screen">
         <SmoothScroll>
           <Header />
-          <div className="flex-1">{children}</div>
+          <div className="flex-1 premium-app-shell">{children}</div>
           <Footer />
         </SmoothScroll>
       </body>
