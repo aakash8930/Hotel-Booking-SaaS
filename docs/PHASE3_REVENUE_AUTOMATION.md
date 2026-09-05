@@ -33,3 +33,7 @@ Next:
 ## Milestone 2: demand-aware pricing calendar
 
 Added GET /host/pricing-calendar/:propertyId with a 1–90 day window. The service calculates occupied rooms per date, derives demand percentage, resolves applicable active pricing rules, and produces per-room suggested prices. This is a preview/simulation layer; booking prices remain unchanged until explicit approval and audit controls are implemented.
+
+## Milestone 3: booking pace engine
+
+Added GET /host/booking-pace/:propertyId. It compares reservation pickup in the latest 7-day window against the preceding 7-day window for each future date, producing accelerating, slowing, or stable pace signals. The output includes booked rooms, occupancy, current pickup, prior pickup, and pace delta.
