@@ -21,6 +21,7 @@ import { AdminModule } from './admin/admin.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { RevenueInsightsModule } from './revenue-insights/revenue-insights.module';
 import { PricingRulesModule } from './pricing-rules/pricing-rules.module';
+import { PricingCalendarModule } from './pricing-calendar/pricing-calendar.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { PricingRulesModule } from './pricing-rules/pricing-rules.module';
     InvoicesModule,
     RevenueInsightsModule,
     PricingRulesModule,
+    PricingCalendarModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
