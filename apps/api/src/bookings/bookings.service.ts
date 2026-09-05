@@ -66,7 +66,25 @@ export class BookingsService {
     }
 
     const nights = this.calculateNights(checkIn, checkOut);
-    const totalPrice = Number(room.basePrice) * nights;
+
+    // Resolve the effective nightly rate for every stay date. A dated price
+    // wins over the room base price; missing dates safely fall back to base.
+    const dailyPrices = await prisma.dailyRoomPrice.findMany({
+      where: {
+        roomId: room.id,
+        effectiveDate: { gte: new Date(Date.UTC(checkIn.getUTCFullYear(), checkIn.getUTCMonth(), checkIn.getUTCDate())), lt: new Date(Date.UTC(checkOut.getUTCFullYear(), checkOut.getUTCMonth(), checkOut.getUTCDate())) },
+      },
+      select: { effectiveDate: true, price: true },
+    });
+    const priceByDate = new Map(
+      dailyPrices.map((p) => [p.effectiveDate.toISOString().slice(0, 10), Number(p.price)]),
+    );
+    const nightlyRates: number[] = [];
+    for (let i = 0; i < nights; i++) {
+      const date = new Date(Date.UTC(checkIn.getUTCFullYear(), checkIn.getUTCMonth(), checkIn.getUTCDate() + i));
+      nightlyRates.push(priceByDate.get(date.toISOString().slice(0, 10)) ?? Number(room.basePrice));
+    }
+    const totalPrice = nightlyRates.reduce((sum, rate) => sum + rate, 0);
 
     const guest = authenticatedGuestId
       ? await prisma.guest.findUniqueOrThrow({ where: { id: authenticatedGuestId } })
