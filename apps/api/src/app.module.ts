@@ -20,6 +20,7 @@ import { PayoutsModule } from './payouts/payouts.module';
 import { AdminModule } from './admin/admin.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { RevenueInsightsModule } from './revenue-insights/revenue-insights.module';
+import { PricingRulesModule } from './pricing-rules/pricing-rules.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { RevenueInsightsModule } from './revenue-insights/revenue-insights.modul
     AdminModule,
     InvoicesModule,
     RevenueInsightsModule,
+    PricingRulesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
