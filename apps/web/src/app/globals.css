@@ -476,3 +476,76 @@ select option {
     radial-gradient(circle at 75% 8%, rgba(228,184,107,.035), transparent 24rem),
     radial-gradient(circle at 15% 42%, rgba(228,184,107,.025), transparent 28rem);
 }
+
+
+/* Route-specific premium compositions */
+.premium-search-page > .mb-8 {
+  padding: 28px 0 26px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.premium-search-page > .mb-8 h1 { font-family:var(--serif); letter-spacing:-.045em; font-weight:400; font-size:clamp(38px,5vw,58px); }
+.premium-search-page aside.card { position:relative; overflow:hidden; background:linear-gradient(160deg,rgba(25,22,19,.96),rgba(13,12,11,.98)); }
+.premium-search-page aside.card::before {
+  content:'FILTER'; position:absolute; top:20px; right:20px; color:rgba(228,184,107,.5);
+  font:600 9px var(--sans); letter-spacing:.18em;
+}
+.premium-search-page .card.cursor-pointer { padding:0; overflow:hidden; }
+.premium-search-page .card.cursor-pointer > div { padding:24px; }
+.premium-search-page .card.cursor-pointer:hover { transform:translateY(-5px); }
+.premium-search-page .card.cursor-pointer .w-full.sm\:w-48 {
+  width:220px; min-height:160px; background:linear-gradient(135deg,#33261a,#171311);
+}
+.premium-property-page .relative.h-\[42vh\] {
+  min-height:520px;
+  background:
+    radial-gradient(circle at 72% 25%,rgba(228,184,107,.28),transparent 18%),
+    linear-gradient(135deg,#241b15 0%,#7b451f 48%,#161311 100%);
+}
+.premium-property-page .relative.h-\[42vh\]::after {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.055) 50%,transparent 70%);
+  transform:translateX(-100%); animation:heroSheen 8s ease-in-out infinite;
+}
+@keyframes heroSheen { 0%,55%{transform:translateX(-100%)} 75%,100%{transform:translateX(100%)} }
+.premium-property-page .container-custom.py-12 { padding-top:80px; }
+.premium-property-page .card { background:linear-gradient(145deg,rgba(27,24,21,.95),rgba(13,12,11,.98)); }
+.premium-property-page h2 { font-family:var(--serif); font-weight:400; letter-spacing:-.035em; }
+.premium-booking-page > h1,
+.premium-trips-page h1,
+.premium-host-page h1,
+.premium-form-page h1,
+.premium-admin-page h1 {
+  font-family:var(--serif); font-weight:400; letter-spacing:-.05em;
+}
+.premium-booking-page > form { position:relative; overflow:hidden; border-radius:24px; padding:32px; }
+.premium-booking-page > form::before {
+  content:'RESERVATION'; position:absolute; top:24px; right:28px;
+  font:600 9px var(--sans); letter-spacing:.2em; color:rgba(228,184,107,.45);
+}
+.premium-booking-page > form h2 { font-family:var(--serif); font-weight:400; letter-spacing:-.03em; }
+.premium-trips-page .card { border-radius:20px; }
+.premium-trips-page .card:hover { transform:translateY(-3px); }
+.premium-auth-page { position:relative; }
+.premium-auth-page::before {
+  content:'STAYEASE'; position:fixed; left:50%; top:28%; transform:translate(-50%,-50%);
+  font:400 clamp(100px,20vw,280px)/1 var(--serif); color:rgba(255,255,255,.012);
+  pointer-events:none; white-space:nowrap;
+}
+.premium-auth-page form { position:relative; border-radius:22px; box-shadow:0 35px 100px rgba(0,0,0,.4); }
+.premium-auth-page form::before {
+  content:'WELCOME BACK'; display:block; margin-bottom:22px;
+  color:var(--gold-light); font:600 9px var(--sans); letter-spacing:.2em;
+}
+.premium-host-page .card { border-radius:18px; }
+.premium-host-page .card:hover { transform:translateY(-2px); }
+.premium-form-page form { border-radius:24px; padding:34px; }
+.premium-form-page form > div { padding-bottom:4px; }
+.premium-admin-page .card { border-radius:18px; }
+.premium-admin-page .card:hover { transform:translateY(-2px); }
+.premium-admin-page .card:first-child { box-shadow:0 20px 70px rgba(200,148,69,.06); }
+
+@media (max-width:700px) {
+  .premium-search-page .card.cursor-pointer .w-full.sm\:w-48 { width:100%; min-height:190px; }
+  .premium-property-page .relative.h-\[42vh\] { min-height:440px; }
+  .premium-booking-page > form,.premium-form-page form { padding:22px; border-radius:18px; }
+}
