@@ -129,7 +129,7 @@ export class PaymentsService {
       },
     });
 
-    let phonepeResponse;
+    let phonepeResponse: Awaited<ReturnType<PhonePeService['initiatePayment']>>;
     try {
       phonepeResponse = await this.phonepe.initiatePayment({
       transactionId,
