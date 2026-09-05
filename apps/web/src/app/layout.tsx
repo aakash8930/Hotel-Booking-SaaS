@@ -19,27 +19,27 @@ const playfair = Playfair_Display({
 
 export const metadata: Metadata = {
   title: {
-    default: 'StayEase — Book Homestays & Independent Hotels',
+    default: 'StayEase — Independent stays, worth remembering.',
     template: '%s | StayEase',
   },
   description:
-    'Discover and book unique homestays and independent hotels across India. Live availability, instant UPI booking, and seamless check-in.',
+    'Discover independent hotels, homestays and quiet retreats across India. Live availability, direct booking and UPI checkout.',
   keywords: [
     'homestay booking',
     'independent hotels India',
     'UPI hotel booking',
-    'Manali homestay',
-    'Goa homestay',
-    'boutique hotel',
+    'boutique hotels',
+    'luxury homestays',
+    'India stays',
   ],
   authors: [{ name: 'StayEase' }],
   openGraph: {
     type: 'website',
     locale: 'en_IN',
     siteName: 'StayEase',
-    title: 'StayEase — Book Homestays & Independent Hotels',
+    title: 'StayEase — Independent stays, worth remembering.',
     description:
-      'Discover and book unique homestays and independent hotels across India.',
+      'Handpicked homestays, boutique hotels and quiet retreats across India.',
   },
   twitter: {
     card: 'summary_large_image',
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: '#0a0a0f',
+  themeColor: '#0a0908',
 };
 
 export default function RootLayout({
