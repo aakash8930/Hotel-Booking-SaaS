@@ -96,7 +96,8 @@ export class PaymentsController {
   ) {
     // ── Validate webhook signature ─────────────────────────────────────
     const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(body));
-    const isValid = this.phonepe.validateWebhookSignature(rawBody, signature);
+    if (!signature) throw new UnauthorizedException('Missing webhook signature');
+    const isValid = this.phonepe.validateWebhookSignature(rawBody.toString('utf8'), signature);
 
     if (!isValid) {
       throw new UnauthorizedException('Invalid webhook signature');
