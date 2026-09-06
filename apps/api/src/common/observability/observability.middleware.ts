@@ -1,6 +1,7 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { randomUUID } from 'crypto';
+import { MetricsService } from './metrics.service';
 
 @Injectable()
 export class ObservabilityMiddleware implements NestMiddleware {
@@ -13,6 +14,7 @@ export class ObservabilityMiddleware implements NestMiddleware {
 
     res.on('finish', () => {
       const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+      this.metrics.record(req.originalUrl,res.statusCode,durationMs);
       process.stdout.write(JSON.stringify({
         event: 'http_request',
         requestId,
