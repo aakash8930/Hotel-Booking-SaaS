@@ -527,14 +527,33 @@ export class PaymentsService {
     const refundTransactionId = `RFD-${Date.now()}-${randomUUID().slice(0, 8)}`;
     const amountPaise = Math.round(refundAmount * 100);
 
+    if (refundAmount <= 0 || refundAmount > Number(payment.amount)) {
+      throw new BadRequestException('Invalid refund amount');
+    }
+    if (payment.status !== PaymentStatus.SUCCESS) {
+      throw new ConflictException('Payment is not refundable');
+    }
+    if (Number(payment.refundedAmount ?? 0) + refundAmount > Number(payment.amount)) {
+      throw new BadRequestException('Refund exceeds captured payment amount');
+    }
+
+    const existingRefund = payment.refundTxnId;
+    if (existingRefund) {
+      return payment;
+    }
+
     const refundResult = await this.phonepe.initiateRefund({
       originalTransactionId: payment.providerTxnId!,
       refundTransactionId,
       amount: amountPaise,
     });
 
+    if (!refundResult.success) {
+      throw new BadRequestException('Refund provider rejected the request');
+    }
+
     const updated = await prisma.payment.update({
-      where: { id: payment.id },
+      where: { id: payment.id, status: PaymentStatus.SUCCESS, refundTxnId: null },
       data: {
         status: PaymentStatus.REFUNDED,
         refundedAmount: refundAmount,
