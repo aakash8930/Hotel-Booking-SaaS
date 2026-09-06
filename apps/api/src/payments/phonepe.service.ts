@@ -15,7 +15,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 import type { PaymentMethod } from '@hbs/prisma';
 
 /** Maps our PaymentMethod enum to PhonePe's paymentInstrument.type values. */
@@ -51,7 +51,13 @@ export class PhonePeService {
   private readonly isSandbox: boolean;
 
   constructor(private readonly config: ConfigService) {
-    this.isSandbox = !this.config.get<string>('PHONEPE_MERCHANT_ID');
+    const merchantId = this.config.get<string>('PHONEPE_MERCHANT_ID');
+    const saltKey = this.config.get<string>('PHONEPE_SALT_KEY');
+    const nodeEnv = this.config.get<string>('NODE_ENV', 'development');
+    if (nodeEnv === 'production' && (!merchantId || !saltKey)) {
+      throw new Error('PhonePe production configuration is incomplete');
+    }
+    this.isSandbox = nodeEnv !== 'production' && !merchantId;
     if (this.isSandbox) {
       this.logger.warn(
         'PhonePe running in SANDBOX mode (no credentials). ' +
@@ -299,7 +305,9 @@ export class PhonePeService {
       saltIndex,
     );
 
-    return expectedChecksum === receivedChecksum;
+    const expected = Buffer.from(expectedChecksum, 'utf8');
+    const received = Buffer.from(receivedChecksum, 'utf8');
+    return expected.length === received.length && timingSafeEqual(expected, received);
   }
 
   /**
