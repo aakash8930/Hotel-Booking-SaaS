@@ -1,3 +1,5 @@
+import { RateLimit } from '../common/security/rate-limit.decorator';
+import { RateLimitGuard } from '../common/security/rate-limit.guard';
 import {
   Controller,
   Get,
@@ -19,6 +21,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { BookingStatus } from '@hbs/prisma';
 
 @Controller()
+@UseGuards(RateLimitGuard)
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
