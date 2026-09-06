@@ -1,3 +1,6 @@
+import { RateLimit } from '../common/security/rate-limit.decorator';
+import { RateLimitGuard } from '../common/security/rate-limit.guard';
+import { UseGuards } from '@nestjs/common';
 import {
   Controller,
   Get,
@@ -23,9 +26,11 @@ interface AuthenticatedRequest extends Request {
 }
 
 @Controller('auth')
+@UseGuards(RateLimitGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @RateLimit('auth')
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60_000 } }) // Max 5 registrations per minute per IP
   async register(@Body() dto: RegisterDto) {
@@ -35,6 +40,7 @@ export class AuthController {
     };
   }
 
+  @RateLimit('auth')
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // Max 10 login attempts per minute per IP
