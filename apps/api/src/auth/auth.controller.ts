@@ -1,6 +1,5 @@
 import { RateLimit } from '../common/security/rate-limit.decorator';
 import { RateLimitGuard } from '../common/security/rate-limit.guard';
-import { UseGuards } from '@nestjs/common';
 import {
   Controller,
   Get,
@@ -51,6 +50,7 @@ export class AuthController {
     };
   }
 
+  @RateLimit('auth')
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() dto: RefreshTokenDto) {
@@ -60,6 +60,7 @@ export class AuthController {
     };
   }
 
+  @RateLimit('auth')
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
