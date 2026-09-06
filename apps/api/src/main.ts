@@ -37,9 +37,13 @@ async function bootstrap() {
     next();
   });
 
-  // CORS is intentionally allowlisted. Set APP_CORS_ORIGINS to a comma-separated list in production.
-  const allowedOrigins = config
-    .get<string>('APP_CORS_ORIGINS', config.get<string>('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'))
+  // CORS is intentionally allowlisted. Production must declare its origins explicitly.
+  const nodeEnv = config.get<string>('NODE_ENV', 'development');
+  const configuredOrigins = config.get<string>('APP_CORS_ORIGINS');
+  if (nodeEnv === 'production' && !configuredOrigins) {
+    throw new Error('APP_CORS_ORIGINS must be configured in production');
+  }
+  const allowedOrigins = (configuredOrigins ?? config.get<string>('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'))
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
