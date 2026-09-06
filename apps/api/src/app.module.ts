@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SecurityModule } from './common/security/security.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -29,6 +30,7 @@ import { PricingExecutionModule } from './pricing-execution/pricing-execution.mo
 
 @Module({
   imports: [
+    SecurityModule,
     // Global config from .env
     ConfigModule.forRoot({
       isGlobal: true,
