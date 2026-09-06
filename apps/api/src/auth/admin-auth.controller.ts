@@ -1,3 +1,5 @@
+import { RateLimit } from '../common/security/rate-limit.decorator';
+import { RateLimitGuard } from '../common/security/rate-limit.guard'; from '../common/security/rate-limit.decorator';
 import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AdminAuthService } from './admin-auth.service';
@@ -12,9 +14,11 @@ interface AuthenticatedRequest extends Request {
 
 /** No /register route — see AdminAuthService. */
 @Controller('auth/admin')
+@UseGuards(RateLimitGuard)
 export class AdminAuthController {
   constructor(private readonly adminAuthService: AdminAuthService) {}
 
+  @RateLimit('auth')
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -22,12 +26,14 @@ export class AdminAuthController {
     return { success: true, data: await this.adminAuthService.login(dto) };
   }
 
+  @RateLimit('auth')
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() dto: RefreshTokenDto) {
     return { success: true, data: await this.adminAuthService.refreshToken(dto.refreshToken) };
   }
 
+  @RateLimit('auth')
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AdminAuthGuard)
