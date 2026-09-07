@@ -46,7 +46,7 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="container-custom pt-28 pb-16 md:pt-32 max-w-2xl">
+    <div className="container-custom pt-28 pb-20 md:pt-32 max-w-4xl premium-booking-page">
       <h1 className="font-display text-3xl md:text-4xl font-bold mb-8 text-surface-900">
         Complete your booking
       </h1>

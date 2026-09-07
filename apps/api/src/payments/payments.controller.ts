@@ -20,16 +20,19 @@ import {
   Body,
   Param,
   Headers,
+  Req,
   HttpCode,
   HttpStatus,
   UseGuards,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PhonePeService } from './phonepe.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BookingStatus, PaymentMethod } from '@hbs/prisma';
+import type { Request } from 'express';
 
 @Controller('payments')
 export class PaymentsController {
@@ -45,10 +48,11 @@ export class PaymentsController {
    * Returns a redirect URL to send the guest to PhonePe.
    */
   @Post('initiate')
-  async initiatePayment(@Body() body: InitiatePaymentDto) {
+  async initiatePayment(@Body() body: InitiatePaymentDto, @Headers('x-booking-access-token') accessToken?: string) {
     const result = await this.paymentsService.initiatePayment(
       body.bookingId,
       (body.method as PaymentMethod) ?? undefined,
+      accessToken,
     );
     return {
       success: true,
@@ -63,8 +67,8 @@ export class PaymentsController {
    * Frontend calls this after the guest returns from payment page.
    */
   @Get('verify/:paymentId')
-  async verifyPayment(@Param('paymentId') paymentId: string) {
-    const result = await this.paymentsService.verifyPayment(paymentId);
+  async verifyPayment(@Param('paymentId') paymentId: string, @Headers('x-booking-access-token') accessToken?: string) {
+    const result = await this.paymentsService.verifyPayment(paymentId, accessToken);
     return {
       success: true,
       data: result,
@@ -88,10 +92,12 @@ export class PaymentsController {
   async handlePhonePeWebhook(
     @Body() body: any,
     @Headers('x-verify') signature: string,
+    @Req() req: Request & { rawBody?: Buffer },
   ) {
     // ── Validate webhook signature ─────────────────────────────────────
-    const rawBody = JSON.stringify(body);
-    const isValid = this.phonepe.validateWebhookSignature(rawBody, signature);
+    const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(body));
+    if (!signature) throw new UnauthorizedException('Missing webhook signature');
+    const isValid = this.phonepe.validateWebhookSignature(rawBody.toString('utf8'), signature);
 
     if (!isValid) {
       throw new UnauthorizedException('Invalid webhook signature');
@@ -142,6 +148,10 @@ export class PaymentsController {
       reason?: string;
     },
   ) {
+    if (body.targetStatus === BookingStatus.REFUNDED || body.targetStatus === BookingStatus.CANCELLED) {
+      throw new ForbiddenException('Use the dedicated cancellation/refund workflow for financial state changes');
+    }
+
     const result = await this.paymentsService.transitionBooking(
       body.bookingId,
       body.targetStatus,

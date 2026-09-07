@@ -25,7 +25,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { prisma } from '@hbs/prisma';
 import { BookingStatus, PaymentStatus } from '@hbs/prisma';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import type { PaymentMethod } from '@hbs/prisma';
 import { assertCanTransition, canTransition } from '../common/booking-state';
 import { PhonePeService } from './phonepe.service';
@@ -57,7 +57,8 @@ export class PaymentsService {
    *   4. Call PhonePe to get redirect URL
    *   5. Return redirect URL to frontend
    */
-  async initiatePayment(bookingId: string, method: PaymentMethod = 'UPI' as PaymentMethod) {
+  async initiatePayment(bookingId: string, method: PaymentMethod = 'UPI' as PaymentMethod, accessToken?: string) {
+    await this.assertBookingAccess(bookingId, accessToken);
     // ── Fetch booking ──────────────────────────────────────────────────
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -128,7 +129,9 @@ export class PaymentsService {
       },
     });
 
-    const phonepeResponse = await this.phonepe.initiatePayment({
+    let phonepeResponse: Awaited<ReturnType<PhonePeService['initiatePayment']>>;
+    try {
+      phonepeResponse = await this.phonepe.initiatePayment({
       transactionId,
       amount: amountPaise,
       callbackUrl: `${appUrl}/booking/${bookingId}/payment-callback?paymentId=${payment.id}`,
@@ -137,7 +140,18 @@ export class PaymentsService {
       guestEmail: booking.guest.email,
       method,
       ...(booking.guest.phone ? { guestPhone: booking.guest.phone } : {}),
-    });
+      });
+    } catch (error) {
+      await prisma.$transaction([
+        prisma.payment.update({ where: { id: payment.id }, data: { status: PaymentStatus.FAILED, completedAt: new Date() } }),
+        prisma.booking.update({ where: { id: bookingId }, data: { status: BookingStatus.CANCELLED, cancelledAt: new Date(), cancellationReason: 'Payment provider initiation failed' } }),
+      ]);
+      this.logger.error(
+        `Payment provider initiation failed for booking ${bookingId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new BadRequestException('Payment provider is temporarily unavailable. Please try again.');
+    }
 
     this.logger.log(
       `Payment initiated: ${payment.id} | txn: ${transactionId} | ₹${booking.totalPrice}`,
@@ -150,6 +164,18 @@ export class PaymentsService {
       amount: Number(booking.totalPrice),
       currency: booking.currency,
     };
+  }
+
+  /** Verify the opaque anonymous-booking capability token. */
+  private async assertBookingAccess(bookingId: string, accessToken?: string): Promise<void> {
+    if (!accessToken) throw new BadRequestException('Booking access token required');
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId }, select: { accessTokenHash: true } });
+    if (!booking?.accessTokenHash) throw new BadRequestException('Invalid booking access token');
+    const supplied = Buffer.from(createHash('sha256').update(accessToken).digest('hex'));
+    const stored = Buffer.from(booking.accessTokenHash);
+    if (supplied.length !== stored.length || !timingSafeEqual(supplied, stored)) {
+      throw new BadRequestException('Invalid booking access token');
+    }
   }
 
   /**
@@ -181,6 +207,17 @@ export class PaymentsService {
         booking: { select: { id: true, status: true } },
       },
     });
+
+    if (payment?.amount && params.amount != null) {
+      const receivedAmount = Number(params.amount);
+      const expectedPaise = Math.round(Number(payment.amount) * 100);
+      if (receivedAmount !== expectedPaise) {
+        this.logger.error(
+          `Webhook amount mismatch for ${transactionId}: expected ${expectedPaise} paise, received ${receivedAmount}`,
+        );
+        return { processed: false, message: 'Payment amount mismatch' };
+      }
+    }
 
     if (!payment) {
       this.logger.warn(`Webhook received for unknown transaction: ${transactionId}`);
@@ -425,7 +462,7 @@ export class PaymentsService {
    * Verify payment status with PhonePe and update our records.
    * Called by the frontend after redirect back from PhonePe.
    */
-  async verifyPayment(paymentId: string) {
+  async verifyPayment(paymentId: string, accessToken?: string) {
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
       include: { booking: true },
@@ -434,6 +471,8 @@ export class PaymentsService {
     if (!payment) {
       throw new NotFoundException('Payment not found');
     }
+
+    await this.assertBookingAccess(payment.bookingId, accessToken);
 
     // If already processed, return current state
     if (payment.status !== PaymentStatus.INITIATED) {
@@ -488,14 +527,33 @@ export class PaymentsService {
     const refundTransactionId = `RFD-${Date.now()}-${randomUUID().slice(0, 8)}`;
     const amountPaise = Math.round(refundAmount * 100);
 
+    if (refundAmount <= 0 || refundAmount > Number(payment.amount)) {
+      throw new BadRequestException('Invalid refund amount');
+    }
+    if (payment.status !== PaymentStatus.SUCCESS) {
+      throw new ConflictException('Payment is not refundable');
+    }
+    if (Number(payment.refundedAmount ?? 0) + refundAmount > Number(payment.amount)) {
+      throw new BadRequestException('Refund exceeds captured payment amount');
+    }
+
+    const existingRefund = payment.refundTxnId;
+    if (existingRefund) {
+      return payment;
+    }
+
     const refundResult = await this.phonepe.initiateRefund({
       originalTransactionId: payment.providerTxnId!,
       refundTransactionId,
       amount: amountPaise,
     });
 
+    if (!refundResult.success) {
+      throw new BadRequestException('Refund provider rejected the request');
+    }
+
     const updated = await prisma.payment.update({
-      where: { id: payment.id },
+      where: { id: payment.id, status: PaymentStatus.SUCCESS, refundTxnId: null },
       data: {
         status: PaymentStatus.REFUNDED,
         refundedAmount: refundAmount,

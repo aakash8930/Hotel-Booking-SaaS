@@ -29,8 +29,9 @@ import (
 // ── Configuration ──────────────────────────────────────────────────────────
 
 type Config struct {
-	Port     string
-	RedisURL string
+	Port          string
+	RedisURL      string
+	AllowedOrigin string
 }
 
 func loadConfig() Config {
@@ -49,9 +50,15 @@ func loadConfig() Config {
 		redisURL = "redis://localhost:6379"
 	}
 
+	allowedOrigin := os.Getenv("WS_ALLOWED_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "http://localhost:3000"
+	}
+
 	return Config{
-		Port:     port,
-		RedisURL: redisURL,
+		Port:          port,
+		RedisURL:      redisURL,
+		AllowedOrigin: allowedOrigin,
 	}
 }
 
@@ -188,13 +195,21 @@ func (h *Hub) run() {
 
 // ── WebSocket Upgrader ─────────────────────────────────────────────────────
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		// In production, restrict origins. For now, allow all for dev/preview.
-		return true
-	},
+func newUpgrader(allowedOrigin string) websocket.Upgrader {
+	allowed := map[string]bool{}
+	for _, origin := range strings.Split(allowedOrigin, ",") {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			allowed[origin] = true
+		}
+	}
+	return websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return allowed[r.Header.Get("Origin")]
+		},
+	}
 }
 
 // ── Event Types ────────────────────────────────────────────────────────────
@@ -209,7 +224,7 @@ type RealtimeEvent struct {
 
 // ── Handlers ───────────────────────────────────────────────────────────────
 
-func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+func serveWs(hub *Hub, upgrader websocket.Upgrader, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
@@ -330,7 +345,7 @@ func main() {
 
 	// WebSocket endpoint
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
+		serveWs(hub, upgrader, w, r)
 	})
 
 	// Health check

@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
+import { SecurityModule } from './common/security/security.module';
+import { ObservabilityModule } from './common/observability/observability.module';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
@@ -18,9 +21,18 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { AdminModule } from './admin/admin.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { RevenueInsightsModule } from './revenue-insights/revenue-insights.module';
+import { PricingRulesModule } from './pricing-rules/pricing-rules.module';
+import { PricingCalendarModule } from './pricing-calendar/pricing-calendar.module';
+import { BookingPaceModule } from './booking-pace/booking-pace.module';
+import { RevenueRecommendationsModule } from './revenue-recommendations/revenue-recommendations.module';
+import { PricingApprovalsModule } from './pricing-approvals/pricing-approvals.module';
+import { PricingExecutionModule } from './pricing-execution/pricing-execution.module';
 
 @Module({
   imports: [
+    SecurityModule,
+    ObservabilityModule,
     // Global config from .env
     ConfigModule.forRoot({
       isGlobal: true,
@@ -57,6 +69,14 @@ import { InvoicesModule } from './invoices/invoices.module';
     PayoutsModule,
     AdminModule,
     InvoicesModule,
+    RevenueInsightsModule,
+    PricingRulesModule,
+    PricingCalendarModule,
+    BookingPaceModule,
+    RevenueRecommendationsModule,
+    PricingApprovalsModule,
+    PricingExecutionModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

@@ -84,6 +84,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message,
         timestamp: new Date().toISOString(),
         path: request.url,
+        requestId: request.header('x-request-id') ?? null,
       },
     });
   }

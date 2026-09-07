@@ -6,7 +6,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { initSentry } from './common/sentry';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
@@ -28,15 +28,28 @@ async function bootstrap() {
     }),
   );
 
-  // CORS for frontend
+  // Basic security headers. Keep this lightweight; the reverse proxy should add HSTS in production.
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
+
+  // CORS is intentionally allowlisted. Production must declare its origins explicitly.
+  const nodeEnv = config.get<string>('NODE_ENV', 'development');
+  const configuredOrigins = config.get<string>('APP_CORS_ORIGINS');
+  if (nodeEnv === 'production' && !configuredOrigins) {
+    throw new Error('APP_CORS_ORIGINS must be configured in production');
+  }
+  const allowedOrigins = (configuredOrigins ?? config.get<string>('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'))
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: [
-      config.get<string>('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'),
-      // Allow preview environments in development
-      ...(process.env.NODE_ENV === 'development'
-        ? [/\.e2b\.app$/]
-        : []),
-    ],
+    origin: allowedOrigins,
     credentials: true,
   });
 

@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { prisma } from '@hbs/prisma';
 import type { RegisterDto } from './dto/register.dto';
 import type { LoginDto } from './dto/login.dto';
@@ -116,7 +117,7 @@ export class AuthService {
    * Refresh an expired access token using a valid refresh token.
    */
   async refreshToken(refreshToken: string): Promise<AuthResponse> {
-    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
 
     // Find the stored refresh token
     const stored = await prisma.refreshToken.findFirst({
@@ -211,10 +212,7 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(
       { ...payload, type: 'refresh' },
       {
-        secret: this.config.get<string>(
-          'JWT_REFRESH_SECRET',
-          'dev-refresh-secret-change-me',
-        ),
+        secret: this.config.get<string>('JWT_REFRESH_SECRET') ?? (process.env.NODE_ENV === 'production' ? (() => { throw new Error('JWT_REFRESH_SECRET is required in production'); })() : 'dev-refresh-secret-change-me'),
         expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRES_IN', '30d'),
       },
     );

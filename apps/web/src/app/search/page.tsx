@@ -139,7 +139,7 @@ function SearchResults() {
   const hasActiveFilters = minPrice || maxPrice || minRating || selectedAmenities.length > 0;
 
   return (
-    <div className="container-custom pt-28 pb-12 md:pt-32">
+    <div className="container-custom pt-28 pb-16 md:pt-32 premium-search-page">
       <div className="mb-8">
         <h1 className="font-display text-3xl md:text-4xl font-bold text-surface-900 mb-2">
           {city ? `Stays in ${city}` : 'Search results'}

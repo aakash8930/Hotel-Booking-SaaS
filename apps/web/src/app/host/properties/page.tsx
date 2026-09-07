@@ -62,7 +62,7 @@ function HostPropertiesDashboard() {
     );
 
   return (
-    <div className="container-custom pt-28 pb-16 md:pt-32 max-w-6xl">
+    <div className="container-custom pt-28 pb-20 md:pt-32 max-w-6xl premium-host-page">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="font-display text-3xl md:text-4xl font-bold text-surface-900">My properties</h1>

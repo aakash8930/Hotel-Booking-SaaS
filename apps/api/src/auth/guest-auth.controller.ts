@@ -1,3 +1,5 @@
+import { RateLimit } from '../common/security/rate-limit.decorator';
+import { RateLimitGuard } from '../common/security/rate-limit.guard'; from '../common/security/rate-limit.decorator';
 import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { GuestAuthService } from './guest-auth.service';
@@ -12,15 +14,18 @@ interface AuthenticatedRequest extends Request {
 }
 
 @Controller('auth/guest')
+@UseGuards(RateLimitGuard)
 export class GuestAuthController {
   constructor(private readonly guestAuthService: GuestAuthService) {}
 
+  @RateLimit('auth')
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async register(@Body() dto: GuestRegisterDto) {
     return { success: true, data: await this.guestAuthService.register(dto) };
   }
 
+  @RateLimit('auth')
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -28,12 +33,14 @@ export class GuestAuthController {
     return { success: true, data: await this.guestAuthService.login(dto) };
   }
 
+  @RateLimit('auth')
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() dto: RefreshTokenDto) {
     return { success: true, data: await this.guestAuthService.refreshToken(dto.refreshToken) };
   }
 
+  @RateLimit('auth')
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(GuestAuthGuard)

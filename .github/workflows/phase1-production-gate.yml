@@ -1,0 +1,55 @@
+name: Phase 1 Production Gate
+
+on:
+  push:
+    branches: [redesign/premium-stayease]
+  pull_request:
+    branches: [redesign/premium-stayease]
+
+concurrency:
+  group: phase1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck/build
+        run: pnpm build
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Dependency audit
+        run: pnpm audit --audit-level=high
+
+  realtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/realtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Test
+        run: go test ./...
+      - name: Build
+        run: go build ./...

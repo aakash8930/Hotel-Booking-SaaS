@@ -1,29 +1,12 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { prisma } from '@hbs/prisma';
 
 @Controller('health')
 export class HealthController {
-  @Get()
-  async check() {
-    let dbStatus = 'disconnected';
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      dbStatus = 'connected';
-    } catch {
-      dbStatus = 'error';
-    }
-
-    return {
-      success: true,
-      data: {
-        status: dbStatus === 'connected' ? 'healthy' : 'degraded',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        services: {
-          api: 'up',
-          database: dbStatus,
-        },
-      },
-    };
-  }
+ @Get() live(){return {status:'ok',service:'api',timestamp:new Date().toISOString()};}
+ @Get('ready')
+ async ready(){
+  try{await prisma.$queryRaw`SELECT 1`;return {status:'ready',checks:{database:'ok'},timestamp:new Date().toISOString()};}
+  catch{throw new ServiceUnavailableException({status:'not_ready',checks:{database:'failed'},timestamp:new Date().toISOString()});}
+ }
 }

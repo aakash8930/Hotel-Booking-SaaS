@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { prisma } from '@hbs/prisma';
 import type { AdminLoginDto } from './dto/admin-login.dto';
 
@@ -52,7 +53,7 @@ export class AdminAuthService {
   }
 
   async refreshToken(refreshToken: string): Promise<AdminAuthResponse> {
-    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
 
     const stored = await prisma.adminRefreshToken.findFirst({
       where: { tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
@@ -95,7 +96,7 @@ export class AdminAuthService {
     const refreshToken = this.jwtService.sign(
       { ...payload, type: 'refresh' },
       {
-        secret: this.config.get<string>('JWT_REFRESH_SECRET', 'dev-refresh-secret-change-me'),
+        secret: this.config.get<string>('JWT_REFRESH_SECRET') ?? (process.env.NODE_ENV === 'production' ? (() => { throw new Error('JWT_REFRESH_SECRET is required in production'); })() : 'dev-refresh-secret-change-me'),
         expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRES_IN', '30d'),
       },
     );

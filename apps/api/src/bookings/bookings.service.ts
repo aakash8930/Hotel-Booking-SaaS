@@ -15,6 +15,7 @@ import { RealtimeService } from '../realtime/realtime.service';
 import { PaymentsService } from '../payments/payments.service';
 import { WhatsAppService } from '../payments/whatsapp.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 
 /** Duration of the soft-hold: 10 minutes to complete payment. */
 const HOLD_DURATION_MS = 10 * 60 * 1000;
@@ -65,7 +66,25 @@ export class BookingsService {
     }
 
     const nights = this.calculateNights(checkIn, checkOut);
-    const totalPrice = Number(room.basePrice) * nights;
+
+    // Resolve the effective nightly rate for every stay date. A dated price
+    // wins over the room base price; missing dates safely fall back to base.
+    const dailyPrices = await prisma.dailyRoomPrice.findMany({
+      where: {
+        roomId: room.id,
+        effectiveDate: { gte: new Date(Date.UTC(checkIn.getUTCFullYear(), checkIn.getUTCMonth(), checkIn.getUTCDate())), lt: new Date(Date.UTC(checkOut.getUTCFullYear(), checkOut.getUTCMonth(), checkOut.getUTCDate())) },
+      },
+      select: { effectiveDate: true, price: true },
+    });
+    const priceByDate = new Map(
+      dailyPrices.map((p) => [p.effectiveDate.toISOString().slice(0, 10), Number(p.price)]),
+    );
+    const nightlyRates: number[] = [];
+    for (let i = 0; i < nights; i++) {
+      const date = new Date(Date.UTC(checkIn.getUTCFullYear(), checkIn.getUTCMonth(), checkIn.getUTCDate() + i));
+      nightlyRates.push(priceByDate.get(date.toISOString().slice(0, 10)) ?? Number(room.basePrice));
+    }
+    const totalPrice = nightlyRates.reduce((sum, rate) => sum + rate, 0);
 
     const guest = authenticatedGuestId
       ? await prisma.guest.findUniqueOrThrow({ where: { id: authenticatedGuestId } })
@@ -73,6 +92,9 @@ export class BookingsService {
     const holdExpiresAt = new Date(Date.now() + HOLD_DURATION_MS);
 
     try {
+      const rawAccessToken = randomBytes(32).toString('base64url');
+      const accessTokenHash = createHash('sha256').update(rawAccessToken).digest('hex');
+
       const booking = await this.createBookingWithDeadlockRetry({
         data: {
           roomId: dto.roomId,
@@ -85,6 +107,7 @@ export class BookingsService {
           totalPrice,
           currency: room.currency,
           specialRequests: dto.specialRequests ?? null,
+          accessTokenHash,
         },
         include: {
           room: {
@@ -119,16 +142,18 @@ export class BookingsService {
         checkOut: dto.checkOut,
       });
 
-      return { ...booking, nights, holdDurationMinutes: HOLD_DURATION_MS / 60_000 };
+      const { accessTokenHash: _accessTokenHash, ...safeBooking } = booking as typeof booking & { accessTokenHash?: string | null };
+      return { ...safeBooking, nights, holdDurationMinutes: HOLD_DURATION_MS / 60_000, accessToken: rawAccessToken };
     } catch (error: unknown) {
       return this.handleBookingError(error);
     }
   }
 
   /**
-   * Get a booking by ID.
+   * Get a booking by ID. Anonymous access requires the opaque booking capability token.
    */
-  async findOne(bookingId: string) {
+  async findOne(bookingId: string, accessToken?: string) {
+    await this.assertBookingAccess(bookingId, accessToken);
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
@@ -155,7 +180,8 @@ export class BookingsService {
       throw new NotFoundException('Booking not found');
     }
 
-    return booking;
+    const { accessTokenHash: _accessTokenHash, ...safeBooking } = booking as typeof booking & { accessTokenHash?: string | null };
+    return safeBooking;
   }
 
   /**
@@ -166,7 +192,8 @@ export class BookingsService {
    * PaymentsService.initiatePayment(). This endpoint exists
    * for backwards compatibility and testing.
    */
-  async confirm(bookingId: string) {
+  async confirm(bookingId: string, accessToken?: string) {
+    await this.assertBookingAccess(bookingId, accessToken);
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
     });
@@ -206,7 +233,8 @@ export class BookingsService {
    * actually cancelling — lets the UI show "you'll get ₹X back" before
    * the guest confirms.
    */
-  async previewCancellation(bookingId: string) {
+  async previewCancellation(bookingId: string, accessToken?: string) {
+    await this.assertBookingAccess(bookingId, accessToken);
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: { room: { select: { property: { select: { cancellationPolicy: true } } } } },
@@ -222,7 +250,8 @@ export class BookingsService {
   /**
    * Cancel a booking — uses state machine to validate transition.
    */
-  async cancel(bookingId: string, reason?: string) {
+  async cancel(bookingId: string, reason?: string, accessToken?: string) {
+    await this.assertBookingAccess(bookingId, accessToken);
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
@@ -289,6 +318,18 @@ export class BookingsService {
     });
 
     return { ...updated, refund };
+  }
+
+  /** Verify the opaque anonymous-booking capability token. */
+  private async assertBookingAccess(bookingId: string, accessToken?: string): Promise<void> {
+    if (!accessToken) throw new ForbiddenException('Booking access token required');
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId }, select: { accessTokenHash: true } });
+    if (!booking?.accessTokenHash) throw new ForbiddenException('Invalid booking access token');
+    const supplied = Buffer.from(createHash('sha256').update(accessToken).digest('hex'));
+    const stored = Buffer.from(booking.accessTokenHash);
+    if (supplied.length !== stored.length || !timingSafeEqual(supplied, stored)) {
+      throw new ForbiddenException('Invalid booking access token');
+    }
   }
 
   /**

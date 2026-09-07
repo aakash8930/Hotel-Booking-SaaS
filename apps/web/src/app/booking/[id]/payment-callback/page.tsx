@@ -13,7 +13,7 @@ interface VerifyResponse {
 
 export default function PaymentCallbackPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen" />}>
+    <Suspense fallback={<div className="min-h-screen premium-callback-page" />}>
       <PaymentCallback />
     </Suspense>
   );
