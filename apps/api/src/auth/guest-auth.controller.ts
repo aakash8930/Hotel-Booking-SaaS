@@ -1,5 +1,5 @@
 import { RateLimit } from '../common/security/rate-limit.decorator';
-import { RateLimitGuard } from '../common/security/rate-limit.guard'; from '../common/security/rate-limit.decorator';
+import { RateLimitGuard } from '../common/security/rate-limit.guard';
 import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { GuestAuthService } from './guest-auth.service';

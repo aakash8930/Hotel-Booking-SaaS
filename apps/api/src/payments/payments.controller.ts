@@ -148,7 +148,7 @@ export class PaymentsController {
       reason?: string;
     },
   ) {
-    if (body.targetStatus === BookingStatus.REFUNDED || body.targetStatus === BookingStatus.CANCELLED) {
+    if (body.targetStatus === BookingStatus.CANCELLED) {
       throw new ForbiddenException('Use the dedicated cancellation/refund workflow for financial state changes');
     }
 

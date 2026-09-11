@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { initSentry } from './common/sentry';
@@ -29,7 +30,7 @@ async function bootstrap() {
   );
 
   // Basic security headers. Keep this lightweight; the reverse proxy should add HSTS in production.
-  app.use((_req, res, next) => {
+  app.use((_req: Request, res: Response, next: NextFunction) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');

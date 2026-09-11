@@ -5,6 +5,8 @@ import { MetricsService } from './metrics.service';
 
 @Injectable()
 export class ObservabilityMiddleware implements NestMiddleware {
+  constructor(private readonly metrics: MetricsService) {}
+
   use(req: Request, res: Response, next: NextFunction) {
     const incoming = req.header('x-request-id');
     const requestId = incoming && /^[A-Za-z0-9._:-]{1,128}$/.test(incoming) ? incoming : randomUUID();

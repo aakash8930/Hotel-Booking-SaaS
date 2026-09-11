@@ -508,8 +508,17 @@ model PricingApproval {
   @@map("pricing_approvals")
 }
 
-enum PricingApprovalAction { INCREASE DECREASE HOLD }
-enum PricingApprovalStatus { PENDING APPROVED REJECTED }
+enum PricingApprovalAction {
+  INCREASE
+  DECREASE
+  HOLD
+}
+
+enum PricingApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
 
 
 model DailyRoomPrice {
@@ -531,4 +540,8 @@ model DailyRoomPrice {
   @@map("daily_room_prices")
 }
 
-enum DailyPriceSource { BASE MANUAL APPROVED_RULE }
+enum DailyPriceSource {
+  BASE
+  MANUAL
+  APPROVED_RULE
+}

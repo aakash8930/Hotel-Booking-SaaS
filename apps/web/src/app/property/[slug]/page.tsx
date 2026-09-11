@@ -8,6 +8,10 @@ import { useAvailability } from '@/lib/use-availability';
 import { FaqChat } from '@/components/property/faq-chat';
 import { ReviewsSection } from '@/components/property/reviews-section';
 import { StarRating } from '@/components/property/star-rating';
+import { PropertyGallery } from '@/components/property/property-gallery';
+import { UrgencyBanner } from '@/components/property/urgency-banner';
+import { StickyBookingBar } from '@/components/property/sticky-booking-bar';
+import { TrustBadge } from '@/components/ui/trust-badge';
 import { PropertyMap } from '@/components/property/property-map';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -82,11 +86,15 @@ export default function PropertyDetailPage() {
 
   return (
     <div>
-      {/* Hero banner — no real photography available, so a branded gradient
-          stands in where a cover photo would normally go. */}
-      <div className="relative h-[42vh] md:h-[52vh] min-h-[320px] bg-gradient-to-br from-brand-700 via-brand-600 to-brand-800 overflow-hidden">
-        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_20%,white,transparent_45%)]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+      {/* Property Gallery */}
+      <div className="relative h-[42vh] md:h-[52vh] min-h-[320px] overflow-hidden">
+        <PropertyGallery
+          images={[
+            property.coverImage,
+            ...property.rooms.flatMap(r => r.images)
+          ].filter(Boolean)}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
 
         <button
           onClick={() => router.back()}
@@ -99,7 +107,7 @@ export default function PropertyDetailPage() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: 'easeOut' }}
-          className="absolute inset-x-0 bottom-0 container-custom pb-8"
+          className="absolute inset-x-0 bottom-0 container-custom pb-8 pointer-events-none"
         >
           <p className="text-brand-100 text-sm tracking-[0.15em] uppercase mb-2">
             {property.city}, {property.state}
@@ -115,9 +123,7 @@ export default function PropertyDetailPage() {
               </span>
             )}
             {property.host.verificationStatus === 'VERIFIED' && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur border border-emerald-400/40 text-sm text-emerald-100">
-                ✓ Verified host
-              </span>
+              <TrustBadge type="HOST" status={property.host.verificationStatus} />
             )}
           </div>
         </motion.div>
@@ -256,6 +262,8 @@ export default function PropertyDetailPage() {
           </div>
         </div>
       </div>
+      <UrgencyBanner propertyId={property.id} />
+      <StickyBookingBar room={property.rooms[0]} propertyId={property.id} />
     </div>
   );
 }

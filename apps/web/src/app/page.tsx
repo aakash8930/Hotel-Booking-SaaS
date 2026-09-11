@@ -2,7 +2,11 @@
 
 import Link from 'next/link';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { ThreeShowcase } from '@/components/layout/three-showcase';
+import { Scene3D } from '@/components/layout/scene-3d';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 const stays = [
   {
@@ -47,6 +51,35 @@ export default function HomePage() {
   const { scrollYProgress } = useScroll();
   const heroY = useTransform(scrollYProgress, [0, 0.2], ['0%', '18%']);
   const heroScale = useTransform(scrollYProgress, [0, 0.2], [1.05, 1]);
+
+  const sectionsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    gsap.registerPlugin(ScrollTrigger);
+
+    const sections = document.querySelectorAll('.reveal-section');
+    sections.forEach((section) => {
+      gsap.fromTo(
+        section,
+        { opacity: 0, y: 50 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 1,
+          ease: 'power3.out',
+          scrollTrigger: {
+            trigger: section,
+            start: 'top 85%',
+            toggleActions: 'play none none reverse',
+          },
+        }
+      );
+    });
+
+    return () => {
+      ScrollTrigger.getAll().forEach(t => t.kill());
+    };
+  }, []);
 
   return (
     <main className="premium-home">
@@ -120,7 +153,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="intro-section section-dark">
+      <section className="intro-section section-dark reveal-section">
         <div className="container-premium intro-grid">
           <div>
             <p className="eyebrow">A different way to stay</p>
@@ -137,7 +170,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="stays-section section-dark">
+      <section className="stays-section section-dark reveal-section">
         <div className="container-premium">
           <div className="section-heading">
             <div>
@@ -179,7 +212,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="destination-section">
+      <section className="destination-section reveal-section">
         <div className="container-premium">
           <div className="section-heading destination-heading">
             <div>
@@ -218,27 +251,21 @@ export default function HomePage() {
             <Link href="/search" className="text-link">See available stays <Arrow /></Link>
           </div>
 
-          <div className="system-card">
-            <div className="system-top">
-              <span>LIVE RESERVATION ENGINE</span>
-              <span className="live-dot">● LIVE</span>
+          <div className="system-card relative overflow-hidden rounded-2xl bg-surface-800 border border-surface-700 h-[400px]">
+            <div className="absolute inset-0 z-0">
+              <Scene3D />
             </div>
-            <div className="room-row">
-              <div className="room-icon">204</div>
-              <div>
-                <strong>Himalayan House</strong>
-                <span>12 Oct — 15 Oct</span>
+            <div className="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-6">
+              <div className="system-top flex justify-between items-center">
+                <span className="text-xs tracking-widest text-surface-400">LIVE RESERVATION ENGINE</span>
+                <span className="live-dot text-xs text-brand-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" /> LIVE
+                </span>
               </div>
-              <b>CONFIRMED</b>
-            </div>
-            <div className="system-line"><i /></div>
-            <div className="blocked-row">
-              <span>Concurrent request</span>
-              <strong>BLOCKED</strong>
-            </div>
-            <div className="system-footer">
-              <span>PostgreSQL exclusion constraint</span>
-              <span>00.04s</span>
+              <div className="system-footer flex justify-between items-end">
+                <span className="text-[10px] text-surface-500 uppercase tracking-tighter">PostgreSQL exclusion constraint</span>
+                <span className="text-[10px] font-mono text-surface-500">00.04s</span>
+              </div>
             </div>
           </div>
         </div>

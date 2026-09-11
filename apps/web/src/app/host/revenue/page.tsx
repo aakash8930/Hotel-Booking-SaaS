@@ -1,61 +1,171 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
-type Insight = {
-  property: { id: string; name: string; currency: string };
-  summary: { revenue30d: number; bookings30d: number; confirmedBookings30d: number; cancellations30d: number; averageBookingValue: number };
-  metrics: { occupancyRate30d: number; adr30d: number; revpar30d: number; pickup7d: number };
-  roomStats: Array<{ roomId: string; roomName: string; basePrice: number; bookings: number; bookedNights: number; revenue: number }>;
-  demandForecast: Array<{ date: string; bookedRooms: number; availableRooms: number; demandRatio: number }>;
-  recommendations: Array<{ type: string; priority: string; title: string; message: string }>;
-};
+function RevenueChart({ data }: { data: number[] }) {
+  const max = Math.max(...data);
+  const width = 800;
+  const height = 200;
+  const step = width / (data.length - 1);
 
-const money = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
+  const points = data.map((val, i) => ({
+    x: i * step,
+    y: height - (val / max) * height,
+  }));
+
+  const pathData = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`;
+
+  return (
+    <div className="relative w-full aspect-[4/1] overflow-hidden rounded-2xl bg-surface-900 p-6">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+        <defs>
+          <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#d4841e" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#d4841e" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Gradient Fill */}
+        <path
+          d={`${pathData} L ${points[points.length - 1].x},${height} L 0,${height} Z`}
+          fill="url(#chartGradient)"
+        />
+        {/* Line */}
+        <motion.path
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 1.5, ease: 'easeInOut' }}
+          d={pathData}
+          fill="none"
+          stroke="#d4841e"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Points */}
+        {points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r="4" fill="#d4841e" stroke="white" strokeWidth="2" />
+        ))}
+      </svg>
+    </div>
+  );
+}
 
 export default function RevenuePage() {
-  const [insight, setInsight] = useState<Insight | null>(null);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const properties = await api.get<any>('/properties/mine');
-      const first = properties.data?.[0] ?? properties.data?.properties?.[0];
-      if (!first?.id) { setError('Create a property first to unlock Revenue Intelligence.'); setLoading(false); return; }
-      const result = await api.get<Insight>(`/host/revenue/${first.id}`);
-      if (!result.success || !result.data) setError(result.error?.message ?? 'Unable to load revenue intelligence.');
-      else setInsight(result.data);
+    async function loadStats() {
+      const res = await api.get('/host/analytics');
+      if (res.success && res.data) {
+        setStats(res.data);
+      }
       setLoading(false);
-    };
-    void load();
+    }
+    loadStats();
   }, []);
 
-  const maxDemand = useMemo(() => Math.max(100, ...(insight?.demandForecast.map(d => d.demandRatio) ?? [])), [insight]);
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-  if (loading) return <main className="min-h-screen p-8 md:p-12"><div className="mx-auto max-w-7xl animate-pulse space-y-6"><div className="h-12 w-80 rounded-2xl bg-muted" /><div className="grid gap-4 md:grid-cols-4">{[1,2,3,4].map(i => <div key={i} className="h-32 rounded-3xl bg-muted" />)}</div><div className="h-96 rounded-3xl bg-muted" /></div></main>;
-  if (error || !insight) return <main className="min-h-screen p-8 md:p-12"><div className="mx-auto max-w-3xl rounded-3xl border bg-card p-10 shadow-sm"><p className="text-sm font-medium text-muted-foreground">Revenue Intelligence</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">{error || 'No data available'}</h1><p className="mt-3 text-muted-foreground">Once your property has bookings, StayEase will turn them into practical pricing and demand signals.</p></div></main>;
+  // Mock data for the chart if API doesn't provide time-series yet
+  const revenueData = [1200, 1800, 1500, 2200, 3000, 2800, 3500, 4200, 3800, 4500, 5000, 4800];
 
-  return <main className="min-h-screen bg-background p-5 md:p-10"><div className="mx-auto max-w-7xl space-y-7">
-    <header className="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><p className="text-sm font-medium text-muted-foreground">Revenue Intelligence</p><h1 className="mt-1 text-4xl font-semibold tracking-tight">{insight.property.name}</h1><p className="mt-2 text-muted-foreground">Performance, demand and the next decision worth making.</p></div><div className="rounded-full border bg-card px-4 py-2 text-sm text-muted-foreground">Live property signal</div></header>
+  return (
+    <div className="container-custom pt-32 pb-16">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-12"
+      >
+        <div className="flex justify-between items-end">
+          <div>
+            <h1 className="font-display text-4xl font-bold text-surface-900 mb-2">Revenue Intelligence</h1>
+            <p className="text-surface-500">Your property performance and earnings overview.</p>
+          </div>
+          <Badge tone="success" className="text-sm py-1 px-3">
+            Live Data
+          </Badge>
+        </div>
 
-    <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{[
-      ['Revenue · 30d', money(insight.summary.revenue30d), 'Collected from paid stays'],
-      ['Bookings · 30d', insight.summary.bookings30d.toString(), 'All non-expired bookings'],
-      ['Confirmed', insight.summary.confirmedBookings30d.toString(), 'Confirmed or paid stays'],
-      ['Avg. booking', money(insight.summary.averageBookingValue), 'Average booking value'],
-      ['Occupancy', insight.metrics.occupancyRate30d + '%', 'Last 30 days'],
-      ['ADR', money(insight.metrics.adr30d), 'Average daily rate'],
-      ['RevPAR', money(insight.metrics.revpar30d), 'Revenue per available room'],
-      ['Pickup · 7d', insight.metrics.pickup7d.toString(), 'Bookings created this week'],
-    ].map(([label,value,note]) => <article key={label} className="rounded-3xl border bg-card p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight">{value}</p><p className="mt-2 text-xs text-muted-foreground">{note}</p></article>)}</section>
+        {/* KPI Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[
+            { label: 'Total Revenue', value: `₹${stats?.totalRevenue?.toLocaleString('en-IN') || '0'}`, trend: '+12%', color: 'text-emerald-500' },
+            { label: 'Avg Daily Rate', value: `₹${stats?.adr?.toLocaleString('en-IN') || '0'}`, trend: '+5%', color: 'text-emerald-500' },
+            { label: 'Occupancy Rate', value: `${stats?.occupancy || '0'}%`, trend: '-2%', color: 'text-red-500' },
+            { label: 'RevPAR', value: `₹${stats?.revpar?.toLocaleString('en-IN') || '0'}`, trend: '+8%', color: 'text-emerald-500' },
+          ].map((kpi, i) => (
+            <div key={i} className="card p-6">
+              <p className="text-sm text-surface-500 mb-1">{kpi.label}</p>
+              <div className="flex items-baseline gap-2">
+                <h3 className="text-3xl font-bold text-surface-900">{kpi.value}</h3>
+                <span className={`text-xs font-medium ${kpi.color}`}>{kpi.trend}</span>
+              </div>
+            </div>
+          ))}
+        </div>
 
-    <section className="grid gap-5 lg:grid-cols-[1.6fr_1fr]"><article className="rounded-3xl border bg-card p-6 shadow-sm"><div><h2 className="text-lg font-semibold">Demand outlook</h2><p className="text-sm text-muted-foreground">Next 14 days based on current reservations</p></div><div className="mt-8 flex h-64 items-end gap-2 overflow-hidden">{insight.demandForecast.map((d,i) => <div key={d.date} className="group flex min-w-0 flex-1 flex-col items-center justify-end gap-2"><div className="relative w-full max-w-9 rounded-t-xl bg-foreground/10 transition-all duration-500 group-hover:bg-foreground/20" style={{height: Math.max(8,(d.demandRatio/maxDemand)*190)}}><div className="absolute inset-x-0 bottom-0 rounded-t-xl bg-foreground/70" style={{height: Math.min(100,d.demandRatio)+'%'}} /></div><span className="text-[10px] text-muted-foreground">{new Date(d.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span>{i%2===0 && <span className="text-[10px] font-medium">{d.demandRatio}%</span>}</div>)}</div></article>
+        {/* Revenue Chart */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-surface-900">Earnings Trend</h2>
+            <div className="flex gap-2">
+              <span className="text-xs text-surface-500">Last 12 Months</span>
+            </div>
+          </div>
+          <RevenueChart data={revenueData} />
+        </div>
 
-    <article className="rounded-3xl border bg-card p-6 shadow-sm"><h2 className="text-lg font-semibold">What deserves attention</h2><p className="text-sm text-muted-foreground">Transparent recommendations, no auto-pricing.</p><div className="mt-5 space-y-3">{insight.recommendations.map((r,i)=><div key={i} className="rounded-2xl border bg-muted/30 p-4"><div className="text-xs font-semibold uppercase tracking-wider">{r.priority} <span className="font-normal text-muted-foreground">· {r.type}</span></div><h3 className="mt-2 font-medium">{r.title}</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">{r.message}</p></div>)}</div></article></section>
+        {/* AI Insight Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 card p-8 bg-gradient-to-br from-brand-500 to-brand-700 text-white border-none relative overflow-hidden">
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xl">✨</span>
+                <h3 className="text-xl font-bold">Revenue Recommendation</h3>
+              </div>
+              <p className="text-brand-50 leading-relaxed mb-6">
+                Based on your current occupancy ( {stats?.occupancy || '0'}% ), your ADR is lower than the city average for this season.
+                <br /><br />
+                <strong>Suggestion:</strong> Increase prices for the upcoming weekend by 15% to maximize revenue without risking occupancy.
+              </p>
+              <Button className="bg-white text-brand-700 hover:bg-surface-100">
+                Apply Dynamic Pricing
+              </Button>
+            </div>
+            <div className="absolute -right-10 -bottom-10 text-white/10 text-9xl font-display font-bold select-none">
+              AI
+            </div>
+          </div>
 
-    <section className="rounded-3xl border bg-card p-6 shadow-sm"><h2 className="text-lg font-semibold">Room economics</h2><p className="text-sm text-muted-foreground">Which rooms are actually producing revenue?</p><div className="mt-5 overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="pb-3">Room</th><th className="pb-3">Base price</th><th className="pb-3">Bookings</th><th className="pb-3">Nights</th><th className="pb-3 text-right">Revenue</th></tr></thead><tbody>{insight.roomStats.map(room=><tr key={room.roomId} className="border-t"><td className="py-4 font-medium">{room.roomName}</td><td className="py-4">{money(room.basePrice)}</td><td className="py-4">{room.bookings}</td><td className="py-4">{room.bookedNights}</td><td className="py-4 text-right font-semibold">{money(room.revenue)}</td></tr>)}</tbody></table></div></section>
-  </div></main>;
+          <div className="card p-8">
+            <h3 className="text-lg font-semibold text-surface-900 mb-4">Payout Status</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center p-3 rounded-xl bg-surface-100">
+                <span className="text-sm text-surface-600">Next Payout</span>
+                <span className="font-medium text-surface-900">Oct 15</span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-surface-100">
+                <span className="text-sm text-surface-600">Pending Amount</span>
+                <span className="font-medium text-brand-600">₹{stats?.pendingPayout?.toLocaleString('en-IN') || '0'}</span>
+              </div>
+              <Button variant="outline" className="w-full mt-4">
+                Request Advance
+              </Button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
 }

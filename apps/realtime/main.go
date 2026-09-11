@@ -19,6 +19,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -345,7 +346,7 @@ func main() {
 
 	// WebSocket endpoint
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, upgrader, w, r)
+		serveWs(hub, newUpgrader(cfg.AllowedOrigin), w, r)
 	})
 
 	// Health check

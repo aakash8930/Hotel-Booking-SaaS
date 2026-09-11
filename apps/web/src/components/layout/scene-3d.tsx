@@ -1,41 +1,86 @@
 'use client';
 
-import { Suspense, useRef } from 'react';
+import { Suspense, useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, MeshDistortMaterial, Environment } from '@react-three/drei';
+import { Float, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
+import * as THREE from 'three';
 import type { Mesh } from 'three';
 
 /**
- * Lightweight 3D showcase — the Spline-alternative called out in the
- * roadmap. There's no Spline scene file for this project (Spline scenes
- * are authored in their GUI, not generated from code), so this uses
- * React Three Fiber directly: a small, free, code-driven WebGL scene.
- *
- * Kept intentionally simple (one distorted sphere, soft float) to stay
- * light on a mobile GPU — this is a decorative accent, not a product tour.
+ * Modular 3D Building Component
+ * This component replaces the distorted sphere with a stylized building
+ * that assembles itself using linear interpolation (lerp).
  */
-function KeyShape() {
+function BuildingBlock({
+  initialPos,
+  targetPos,
+  size,
+  color = '#ffffff'
+}: {
+  initialPos: [number, number, number],
+  targetPos: [number, number, number],
+  size: [number, number, number],
+  color?: string
+}) {
   const meshRef = useRef<Mesh>(null);
 
-  useFrame((_, delta) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += delta * 0.15;
-    }
+  // Use a simple animation state that increments over time
+  // In a real app, this could be linked to scroll progress via a store or context
+  useFrame((state) => {
+    if (!meshRef.current) return;
+
+    // Assembly speed
+    const t = (Math.sin(state.clock.elapsedTime * 0.5) + 1) / 2; // Oscillate between 0 and 1
+
+    // For a "one-time" assembly, we'd use a different trigger.
+    // Here we use a slow oscillation to keep the scene dynamic.
+
+    meshRef.current.position.lerp(
+      new THREE.Vector3(...(t > 0.8 ? targetPos : initialPos)),
+      0.05
+    );
+
+    // Subtle rotation
+    meshRef.current.rotation.y += 0.002;
   });
 
   return (
-    <Float speed={1.4} rotationIntensity={0.5} floatIntensity={0.8}>
-      <mesh ref={meshRef}>
-        <icosahedronGeometry args={[1.4, 4]} />
-        <MeshDistortMaterial
-          color="#d4841e"
-          distort={0.35}
-          speed={1.6}
-          roughness={0.2}
-          metalness={0.4}
-        />
-      </mesh>
-    </Float>
+    <mesh ref={meshRef} position={initialPos}>
+      <boxGeometry args={size} />
+      <meshStandardMaterial
+        color={color}
+        metalness={0.8}
+        roughness={0.2}
+        transparent
+        opacity={0.9}
+      />
+    </mesh>
+  );
+}
+
+function HotelBuilding() {
+  // Define the architectural structure of the building
+  const blocks = useMemo(() => [
+    // Base
+    { initialPos: [-5, -2, -5] as [number, number, number], targetPos: [0, -1, 0] as [number, number, number], size: [2, 0.5, 2] as [number, number, number], color: '#a1a1aa' },
+    // Floor 1
+    { initialPos: [5, 2, 5] as [number, number, number], targetPos: [0, 0, 0] as [number, number, number], size: [1.8, 1, 1.8] as [number, number, number], color: '#e4e4e7' },
+    // Floor 2
+    { initialPos: [-5, 5, 5] as [number, number, number], targetPos: [0, 1, 0] as [number, number, number], size: [1.8, 1, 1.8] as [number, number, number], color: '#ffffff' },
+    // Top Accent
+    { initialPos: [5, -5, -5] as [number, number, number], targetPos: [0.5, 1.5, 0.5] as [number, number, number], size: [0.5, 0.5, 0.5] as [number, number, number], color: '#d4841e' },
+    // Roof
+    { initialPos: [0, 10, 0] as [number, number, number], targetPos: [0, 2, 0] as [number, number, number], size: [2.2, 0.2, 2.2] as [number, number, number], color: '#71717a' },
+    // Side Wing
+    { initialPos: [10, 0, 0] as [number, number, number], targetPos: [1.5, 0, 0] as [number, number, number], size: [0.8, 1, 1.2] as [number, number, number], color: '#e4e4e7' },
+  ], []);
+
+  return (
+    <group>
+      {blocks.map((block, i) => (
+        <BuildingBlock key={i} {...block} />
+      ))}
+    </group>
   );
 }
 
@@ -43,14 +88,26 @@ export function Scene3D() {
   return (
     <div className="w-full h-full">
       <Canvas
-        camera={{ position: [0, 0, 4.5], fov: 45 }}
-        dpr={[1, 1.5]}
+        camera={{ position: [4, 3, 6], fov: 40 }}
+        dpr={[1, 2]}
         gl={{ antialias: true, alpha: true }}
       >
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[3, 3, 3]} intensity={1.2} />
+        <color attach="background" args={['transparent']} />
+        <ambientLight intensity={0.5} />
+        <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
+        <pointLight position={[-10, -10, -10]} intensity={0.5} />
+
         <Suspense fallback={null}>
-          <KeyShape />
+          <Float speed={1} rotationIntensity={0.2} floatIntensity={0.2}>
+            <HotelBuilding />
+          </Float>
+          <ContactShadows
+            position={[0, -1.5, 0]}
+            opacity={0.4}
+            scale={10}
+            blur={2}
+            far={4.5}
+          />
           <Environment preset="city" />
         </Suspense>
       </Canvas>

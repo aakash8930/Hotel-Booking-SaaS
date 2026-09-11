@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,6 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string }[] =
 
 export default function BookingConfirmationPage() {
   const params = useParams();
-  const router = useRouter();
   const bookingId = params.id as string;
 
   const [booking, setBooking] = useState<Booking | null>(null);

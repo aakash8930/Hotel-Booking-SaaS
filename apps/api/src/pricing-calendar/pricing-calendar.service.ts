@@ -4,7 +4,7 @@ import { prisma, Prisma } from '@hbs/prisma';
 @Injectable()
 export class PricingCalendarService {
   async getCalendar(hostId: string, propertyId: string, from?: string, days = 30) {
-    const property = await prisma.property.findFirst({ where: { id: propertyId, hostId }, include: { rooms: { select: { id: true, name: true, basePrice: true } } } });
+    const property = await prisma.property.findFirst({ where: { id: propertyId, hostId }, include: { rooms: { select: { id: true, name: true, basePrice: true, currency: true } } } });
     if (!property) throw new NotFoundException('Property not found');
     const start = from ? new Date(from + 'T00:00:00.000Z') : new Date();
     start.setUTCHours(0,0,0,0);

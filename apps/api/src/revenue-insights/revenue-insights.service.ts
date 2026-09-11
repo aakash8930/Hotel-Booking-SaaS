@@ -20,7 +20,7 @@ export class RevenueInsightsService {
       orderBy: { createdAt: 'asc' },
     });
 
-    const activeRevenueStatuses = [BookingStatus.PAID, BookingStatus.CHECKED_IN, BookingStatus.CHECKED_OUT];
+    const activeRevenueStatuses: BookingStatus[] = [BookingStatus.PAID, BookingStatus.CHECKED_IN, BookingStatus.CHECKED_OUT];
     const revenue = bookings.filter(b => activeRevenueStatuses.includes(b.status))
       .reduce((sum, b) => sum + Number(b.totalPrice), 0);
     const confirmed = bookings.filter(b =>

@@ -23,9 +23,15 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const lenis = new Lenis({
-      duration: 1.2,
+      duration: 1.5,
       easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      touchMultiplier: 2,
+      orientation: 'vertical',
+      gestureOrientation: 'vertical',
+      smoothWheel: true,
+      wheelMultiplier: 1,
+      touchMultiplier: 1.5,
+      infinite: false,
+      startPosition: 0,
     });
 
     lenisRef.current = lenis;
